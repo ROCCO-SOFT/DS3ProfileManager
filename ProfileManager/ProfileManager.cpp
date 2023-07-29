@@ -1,24 +1,24 @@
 ﻿#include "pch.h"
 #include "framework.h"
-#include "DS3ProfileManager.h"
-#include "DS3ProfileManagerDialog.h"
+#include "ProfileManager.h"
+#include "ProfileManagerDialog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
-BEGIN_MESSAGE_MAP(CDS3ProfileManagerApp, CWinApp)
+BEGIN_MESSAGE_MAP(CProfileManagerApp, CWinApp)
 	ON_COMMAND(ID_HELP, &CWinApp::OnHelp)
 END_MESSAGE_MAP()
 
-CDS3ProfileManagerApp theApp;
+CProfileManagerApp theApp;
 
-CDS3ProfileManagerApp::CDS3ProfileManagerApp()
+CProfileManagerApp::CProfileManagerApp()
 {
 
 }
 
-BOOL CDS3ProfileManagerApp::InitInstance()
+BOOL CProfileManagerApp::InitInstance()
 {
 	INITCOMMONCONTROLSEX InitCtrls;
 	InitCtrls.dwSize = sizeof(InitCtrls);
@@ -35,7 +35,7 @@ BOOL CDS3ProfileManagerApp::InitInstance()
 
 	SetRegistryKey(_T("RoccoSoft"));
 
-	CDS3ProfileManagerDialog dlg;
+	CProfileManagerDialog dlg;
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)

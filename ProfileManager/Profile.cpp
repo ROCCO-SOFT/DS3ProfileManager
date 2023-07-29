@@ -5,11 +5,6 @@
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 
-#define PROFILE_FNAME_FORMAT	_T("%016I64x_%016I64x_")
-#define DS3_PROFILE_FOLDER		_T("DarkSoulsIII\\")
-#define DS3_SL2_FILE_NAME		_T("DS30000.sl2")
-#define APP_PROFILE_FOLDER		_T("DS3ProfileManager\\")
-
 void Replace(LPTSTR psz, TCHAR c1, TCHAR c2)
 {
 	LPTSTR p = psz;
@@ -219,9 +214,9 @@ HRESULT CContextImpl::Open(CContext **ppContext)
 		return hr;	// AppDataの場所が取れない。
 	}
 
-	strProfile += DS3_PROFILE_FOLDER;
+	strProfile += PROFILE_FOLDER;
 	if (!PathFileExists(strProfile)) {
-		return E_FAIL;	// DS3のプロファイルが見つからない。
+		return E_FAIL;	// プロファイルが見つからない。
 	}
 
 	CString strBackup;
@@ -230,7 +225,15 @@ HRESULT CContextImpl::Open(CContext **ppContext)
 		return hr;	// Personalの場所が取れない。
 	}
 
+#if 0
 	strBackup += APP_PROFILE_FOLDER;
+#else
+	TCHAR path[_MAX_PATH], drive[_MAX_DRIVE], dir[_MAX_DIR], fname[_MAX_FNAME], ext[_MAX_EXT];
+	GetModuleFileName(NULL, path, numof(path));
+	_tsplitpath_s(path, drive, dir, fname, ext);
+	strBackup += fname;
+	strBackup +=_T("\\");
+#endif
 	if (!PathFileExists(strBackup)) {
 		if (!CreateDirectory(strBackup, NULL)) {
 			return E_FAIL;	// バックアップフォルダが作れない。
@@ -251,7 +254,7 @@ HRESULT CContextImpl::Open(CContext **ppContext)
 	}
 
 	if (pThis->m_listBackupSet.empty()) {
-		return E_FAIL;	// DS3のセーブデータがない可能性がある。
+		return E_FAIL;	// セーブデータがない可能性がある。
 	}
 
 	*ppContext = pThis;
@@ -582,7 +585,7 @@ HRESULT CBackupImpl::Save()
 
 	SHFileOperation(&fos);
 
-	CString strSL2 = m_strPath + DS3_SL2_FILE_NAME;
+	CString strSL2 = m_strPath + SL2_FILE_NAME;
 	if (!PathFileExists(strSL2)) {
 		return E_FAIL;
 	}
@@ -656,7 +659,7 @@ HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, UINT64 idDefault, 
 	}
 
 #if 1
-	CString strSL2 = strPath + DS3_SL2_FILE_NAME;
+	CString strSL2 = strPath + SL2_FILE_NAME;
 	if (!PathFileExists(strSL2)) {
 		return E_FAIL;
 	}

@@ -6,13 +6,13 @@
 
 #include "resource.h"
 
-class CDS3ProfileManagerApp : public CWinApp
+class CProfileManagerApp : public CWinApp
 {
 public:
-	CDS3ProfileManagerApp();
+	CProfileManagerApp();
 	virtual BOOL InitInstance();
 
 	DECLARE_MESSAGE_MAP()
 };
 
-extern CDS3ProfileManagerApp theApp;
+extern CProfileManagerApp theApp;

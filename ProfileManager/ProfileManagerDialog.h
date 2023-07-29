@@ -10,12 +10,11 @@
 #define AC_MOVE_HV    0x00000010
 #define AC_MOVE_H     0x00000020
 #define AC_MOVE_V     0x00000030
-#define numof(ar)		(sizeof(ar)/sizeof((ar)[0]))
 
-class CDS3ProfileManagerDialog : public CDialogEx
+class CProfileManagerDialog : public CDialogEx
 {
 public:
-	CDS3ProfileManagerDialog(CWnd* pParent = nullptr);
+	CProfileManagerDialog(CWnd* pParent = nullptr);
 	int AddList(CBackup *pBackup);
 	int UpdateList(int nItem);
 	void UpdateLastSave(int nItem);
@@ -25,7 +24,7 @@ public:
 		int nFormat = LVCFMT_LEFT, int nWidth = -1, int nSubItem = -1);
 
 #ifdef AFX_DESIGN_TIME
-	enum { IDD = IDD_DS3PROFILEMANAGER };
+	enum { IDD = IDD_PROFILE_MANAGER };
 #endif
 
 	protected:
@@ -51,4 +50,5 @@ public:
 	afx_msg void OnBnClickedRemoveButton();
 	afx_msg void OnLvnEndlabeleditProfileList(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
+	afx_msg void OnClose();
 };

@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
 #include "framework.h"
-#include "DS3ProfileManager.h"
-#include "DS3ProfileManagerDialog.h"
+#include "ProfileManager.h"
+#include "ProfileManagerDialog.h"
 #include "afxdialogex.h"
 #include "Profile.h"
 
@@ -44,46 +44,57 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 
-BEGIN_MESSAGE_MAP(CDS3ProfileManagerDialog, CDialogEx)
+BEGIN_MESSAGE_MAP(CProfileManagerDialog, CDialogEx)
 	ON_WM_SYSCOMMAND()
-	ON_BN_CLICKED(IDC_SAVE_BUTTON, &CDS3ProfileManagerDialog::OnBnClickedSaveButton)
-	ON_BN_CLICKED(IDC_LOAD_BUTTON, &CDS3ProfileManagerDialog::OnBnClickedLoadButton)
+	ON_BN_CLICKED(IDC_SAVE_BUTTON, &CProfileManagerDialog::OnBnClickedSaveButton)
+	ON_BN_CLICKED(IDC_LOAD_BUTTON, &CProfileManagerDialog::OnBnClickedLoadButton)
 	ON_WM_SIZE()
-	ON_BN_CLICKED(IDC_OVERWRITE_BUTTON, &CDS3ProfileManagerDialog::OnBnClickedOverwriteButton)
-	ON_NOTIFY(LVN_ITEMCHANGED, IDC_PROFILE_LIST, &CDS3ProfileManagerDialog::OnLvnItemchangedProfileList)
-	ON_BN_CLICKED(IDC_REMOVE_BUTTON, &CDS3ProfileManagerDialog::OnBnClickedRemoveButton)
-	ON_NOTIFY(LVN_ENDLABELEDIT, IDC_PROFILE_LIST, &CDS3ProfileManagerDialog::OnLvnEndlabeleditProfileList)
+	ON_BN_CLICKED(IDC_OVERWRITE_BUTTON, &CProfileManagerDialog::OnBnClickedOverwriteButton)
+	ON_NOTIFY(LVN_ITEMCHANGED, IDC_PROFILE_LIST, &CProfileManagerDialog::OnLvnItemchangedProfileList)
+	ON_BN_CLICKED(IDC_REMOVE_BUTTON, &CProfileManagerDialog::OnBnClickedRemoveButton)
+	ON_NOTIFY(LVN_ENDLABELEDIT, IDC_PROFILE_LIST, &CProfileManagerDialog::OnLvnEndlabeleditProfileList)
 	ON_WM_GETMINMAXINFO()
+	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
-CDS3ProfileManagerDialog::CDS3ProfileManagerDialog(CWnd* pParent /*=nullptr*/)
-	: CDialogEx(IDD_DS3PROFILEMANAGER, pParent)
+CProfileManagerDialog::CProfileManagerDialog(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_PROFILE_MANAGER, pParent)
 	, m_nLastStatus(-1)
 {
-//	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+
 }
 
-void CDS3ProfileManagerDialog::DoDataExchange(CDataExchange* pDX)
+void CProfileManagerDialog::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_PROFILE_LIST, m_listProfile);
 }
 
-BOOL CDS3ProfileManagerDialog::InsertListColumn(CListCtrl *pList, int nCol, UINT nCaptionID, int nFormat, int nWidth, int nSubItem)
+BOOL CProfileManagerDialog::InsertListColumn(CListCtrl *pList, int nCol, UINT nCaptionID, int nFormat, int nWidth, int nSubItem)
 {
 	CString strCaption;
 	strCaption.LoadString(nCaptionID);
 	return pList->InsertColumn(nCol, strCaption, nFormat, nWidth, nSubItem);
 }
 
-BOOL CDS3ProfileManagerDialog::OnInitDialog()
+BOOL CProfileManagerDialog::OnInitDialog()
 {
 	HRESULT hr = S_OK;
 
 	CDialogEx::OnInitDialog();
 
+	// 初期のサイズが最小サイズ。
+	GetClientRect(&m_rcClientMin);
+
+	CRect rc;
+	GetWindowRect(&rc);
+	rc.left = AfxGetApp()->GetProfileInt(_T("Settings"), _T("MainWindow.Left"), rc.left);
+	rc.top = AfxGetApp()->GetProfileInt(_T("Settings"), _T("MainWindow.Top"), rc.top);
+	rc.right = AfxGetApp()->GetProfileInt(_T("Settings"), _T("MainWindow.Right"), rc.right);
+	rc.bottom = AfxGetApp()->GetProfileInt(_T("Settings"), _T("MainWindow.Bottom"), rc.bottom);
+	SetWindowPos(NULL, rc.left, rc.top, rc.Width(), rc.Height(), SWP_NOZORDER);
+
 	GetClientRect(&m_rcClient);
-	m_rcClientMin = m_rcClient;
 
 	// "バージョン情報..." メニューをシステム メニューに追加します。
 	// IDM_ABOUTBOX は、システム コマンドの範囲内になければなりません。
@@ -109,10 +120,18 @@ BOOL CDS3ProfileManagerDialog::OnInitDialog()
 		return FALSE;
 	}
 
+	int nNameWidth = 120;
+	int nDateWidth = 140;
+	int nStatusWidth = 80;
+
+	nNameWidth = AfxGetApp()->GetProfileInt(_T("Settings"), _T("HeaderColumn.Name.Width"), nNameWidth);
+	nDateWidth = AfxGetApp()->GetProfileInt(_T("Settings"), _T("HeaderColumn.Date.Width"), nDateWidth);
+	nStatusWidth = AfxGetApp()->GetProfileInt(_T("Settings"), _T("HeaderColumn.Status.Width"), nStatusWidth);
+
 	m_listProfile.SetExtendedStyle(LVS_EX_FULLROWSELECT);
-	InsertListColumn(&m_listProfile, 0, IDS_LIST_HEADER_NAME, 0, 200);
-	InsertListColumn(&m_listProfile, 1, IDS_LIST_HEADER_DATE, 0, 140);
-	InsertListColumn(&m_listProfile, 2, IDS_LIST_HEADER_STATUS, 0, 80);
+	InsertListColumn(&m_listProfile, 0, IDS_LIST_HEADER_NAME, 0, nNameWidth);
+	InsertListColumn(&m_listProfile, 1, IDS_LIST_HEADER_DATE, 0, nDateWidth);
+	InsertListColumn(&m_listProfile, 2, IDS_LIST_HEADER_STATUS, 0, nStatusWidth);
 
 	CComPtr <CBackupEnum> pEnum;
 	hr = m_pContext->GetCurrentBackupSet()->EnumBackup(&pEnum);
@@ -131,7 +150,7 @@ BOOL CDS3ProfileManagerDialog::OnInitDialog()
 	return TRUE;
 }
 
-int CDS3ProfileManagerDialog::AddList(CBackup *pBackup)
+int CProfileManagerDialog::AddList(CBackup *pBackup)
 {
 	int nItem = m_listProfile.InsertItem(m_listProfile.GetItemCount(), pBackup->GetName());
 	SYSTEMTIME stCreate = pBackup->GetCreateTime();
@@ -144,7 +163,7 @@ int CDS3ProfileManagerDialog::AddList(CBackup *pBackup)
 	return nItem;
 }
 
-int CDS3ProfileManagerDialog::UpdateList(int nItem)
+int CProfileManagerDialog::UpdateList(int nItem)
 {
 	CBackup *pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
 
@@ -157,7 +176,7 @@ int CDS3ProfileManagerDialog::UpdateList(int nItem)
 	return nItem;
 }
 
-void CDS3ProfileManagerDialog::OnSysCommand(UINT nID, LPARAM lParam)
+void CProfileManagerDialog::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	if ((nID & 0xFFF0) == IDM_ABOUTBOX)
 	{
@@ -170,7 +189,7 @@ void CDS3ProfileManagerDialog::OnSysCommand(UINT nID, LPARAM lParam)
 	}
 }
 
-void CDS3ProfileManagerDialog::UpdateLastSave(int nItem)
+void CProfileManagerDialog::UpdateLastSave(int nItem)
 {
 	if (m_nLastStatus != -1) {
 		m_listProfile.SetItemText(m_nLastStatus, 2, _T(""));
@@ -179,7 +198,7 @@ void CDS3ProfileManagerDialog::UpdateLastSave(int nItem)
 	m_listProfile.SetItemText(m_nLastStatus, 2, _T("Saved"));
 }
 
-void CDS3ProfileManagerDialog::UpdateLastLoad(int nItem)
+void CProfileManagerDialog::UpdateLastLoad(int nItem)
 {
 	if (m_nLastStatus != -1) {
 		m_listProfile.SetItemText(m_nLastStatus, 2, _T(""));
@@ -188,7 +207,7 @@ void CDS3ProfileManagerDialog::UpdateLastLoad(int nItem)
 	m_listProfile.SetItemText(m_nLastStatus, 2, _T("Loaded"));
 }
 
-void CDS3ProfileManagerDialog::OnBnClickedSaveButton()
+void CProfileManagerDialog::OnBnClickedSaveButton()
 {
 	HRESULT hr = S_OK;
 
@@ -211,7 +230,7 @@ void CDS3ProfileManagerDialog::OnBnClickedSaveButton()
 	m_listProfile.GetEditControl()->SetFocus();
 }
 
-void CDS3ProfileManagerDialog::OnBnClickedOverwriteButton()
+void CProfileManagerDialog::OnBnClickedOverwriteButton()
 {
 	HRESULT hr = S_OK;
 
@@ -236,7 +255,7 @@ void CDS3ProfileManagerDialog::OnBnClickedOverwriteButton()
 	UpdateLastSave(nItem);
 }
 
-void CDS3ProfileManagerDialog::OnBnClickedLoadButton()
+void CProfileManagerDialog::OnBnClickedLoadButton()
 {
 	HRESULT hr = S_OK;
 
@@ -260,7 +279,7 @@ void CDS3ProfileManagerDialog::OnBnClickedLoadButton()
 	UpdateLastLoad(nItem);
 }
 
-void CDS3ProfileManagerDialog::OnBnClickedRemoveButton()
+void CProfileManagerDialog::OnBnClickedRemoveButton()
 {
 	HRESULT hr = S_OK;
 
@@ -287,7 +306,7 @@ void CDS3ProfileManagerDialog::OnBnClickedRemoveButton()
 	m_listProfile.DeleteItem(nItem);
 }
 
-BOOL CDS3ProfileManagerDialog::AlignControl(HWND hParent, int cx, int cy, int arID[], int nCount, int nFunc)
+BOOL CProfileManagerDialog::AlignControl(HWND hParent, int cx, int cy, int arID[], int nCount, int nFunc)
 {
 	for (int n = 0; n < nCount; n++) {
 		HWND hWnd = ::GetDlgItem(hParent, arID[n]);
@@ -326,7 +345,7 @@ BOOL CDS3ProfileManagerDialog::AlignControl(HWND hParent, int cx, int cy, int ar
 	return TRUE;
 }
 
-void CDS3ProfileManagerDialog::OnSize(UINT nType, int cx, int cy)
+void CProfileManagerDialog::OnSize(UINT nType, int cx, int cy)
 {
 	CDialogEx::OnSize(nType, cx, cy);
 
@@ -373,7 +392,7 @@ void CDS3ProfileManagerDialog::OnSize(UINT nType, int cx, int cy)
 
 }
 
-void CDS3ProfileManagerDialog::OnLvnItemchangedProfileList(NMHDR *pNMHDR, LRESULT *pResult)
+void CProfileManagerDialog::OnLvnItemchangedProfileList(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
 
@@ -387,7 +406,7 @@ void CDS3ProfileManagerDialog::OnLvnItemchangedProfileList(NMHDR *pNMHDR, LRESUL
 
 
 
-void CDS3ProfileManagerDialog::OnLvnEndlabeleditProfileList(NMHDR *pNMHDR, LRESULT *pResult)
+void CProfileManagerDialog::OnLvnEndlabeleditProfileList(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	HRESULT hr = S_OK;
 
@@ -407,10 +426,31 @@ void CDS3ProfileManagerDialog::OnLvnEndlabeleditProfileList(NMHDR *pNMHDR, LRESU
 }
 
 
-void CDS3ProfileManagerDialog::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
+void CProfileManagerDialog::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
 	CDialogEx::OnGetMinMaxInfo(lpMMI);
 
 	lpMMI->ptMinTrackSize.x = m_rcClientMin.Width();
 	lpMMI->ptMinTrackSize.y = m_rcClientMin.Height();
+}
+
+
+void CProfileManagerDialog::OnClose()
+{
+	CRect rc;
+	GetWindowRect(&rc);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("MainWindow.Left"), rc.left);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("MainWindow.Top"), rc.top);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("MainWindow.Right"), rc.right);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("MainWindow.Bottom"), rc.bottom);
+
+	int nNameWidth = m_listProfile.GetColumnWidth(0);
+	int nDateWidth = m_listProfile.GetColumnWidth(1);
+	int nStatusWidth = m_listProfile.GetColumnWidth(2);
+
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("HeaderColumn.Name.Width"), nNameWidth);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("HeaderColumn.Date.Width"), nDateWidth);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("HeaderColumn.Status.Width"), nStatusWidth);
+
+	CDialogEx::OnClose();
 }

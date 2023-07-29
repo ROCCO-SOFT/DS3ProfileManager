@@ -8,8 +8,19 @@ enum PROFILE_ERROR
 	PROFILE_E_INVALID_PARAMETER = MAKE_HRESULT(SEVERITY_ERROR, FACILITY_PROFILE, 0x0001),	///< パラメーターが不正。NULLあるいは不正なメモリ(DEBUGビルドのみ)を指している。
 	PROFILE_E_NOT_ENOUGH_MEMORY = MAKE_HRESULT(SEVERITY_ERROR, FACILITY_PROFILE, 0x0002),	///< メモリが足りない。
 	PROFILE_E_OPEN_FAILED = MAKE_HRESULT(SEVERITY_ERROR, FACILITY_PROFILE, 0x0003),			///< ファイルが開けなかった。
-	PROFILE_E_NOT_FOUND_DS3 = MAKE_HRESULT(SEVERITY_ERROR, FACILITY_PROFILE, 0x0004),		///< DS3のプロファイルデータが見つからなかった。
+	PROFILE_E_NOT_FOUND_PROFILE = MAKE_HRESULT(SEVERITY_ERROR, FACILITY_PROFILE, 0x0004),		///< DS3のプロファイルデータが見つからなかった。
 };
+
+#define numof(ar)		(sizeof(ar)/sizeof((ar)[0]))
+
+#define PROFILE_FNAME_FORMAT	_T("%016I64x_%016I64x_")
+#ifdef _DS3
+#define PROFILE_FOLDER			_T("DarkSoulsIII\\")
+#define SL2_FILE_NAME			_T("DS30000.sl2")
+#elif _ER
+#define PROFILE_FOLDER			_T("EldenRing\\")
+#define SL2_FILE_NAME			_T("ER0000.sl2")
+#endif
 
 class CContext;
 class CBackupSet;
