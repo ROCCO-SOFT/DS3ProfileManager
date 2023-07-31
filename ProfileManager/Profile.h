@@ -13,7 +13,7 @@ enum PROFILE_ERROR
 
 #define numof(ar)		(sizeof(ar)/sizeof((ar)[0]))
 
-#define PROFILE_FNAME_FORMAT	_T("%016I64x_%016I64x_")
+#define PROFILE_FNAME_FORMAT	_T("%s_%016I64x_")
 #ifdef _DS3
 #define PROFILE_FOLDER_NAME		_T("DarkSoulsIII")
 #define SL2_FILE_NAME			_T("DS30000.sl2")
@@ -45,7 +45,7 @@ public:
 	virtual HRESULT SaveCurrent(CBackup **ppBackup, PCTSTR pszName) = 0;
 	virtual HRESULT RemoveBackup(CBackup *pBackup) = 0;
 	virtual CString GetProfilePath() = 0;
-	virtual UINT64 GetProfileId() = 0;
+	virtual CString GetProfileId() = 0;
 
 };
 

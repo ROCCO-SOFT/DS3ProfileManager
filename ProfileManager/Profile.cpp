@@ -55,15 +55,15 @@ public:
 	virtual HRESULT SaveCurrent(CBackup **ppBackup, PCTSTR pszName);
 	virtual HRESULT RemoveBackup(CBackup *pBackup);
 	virtual CString GetProfilePath();
-	virtual UINT64 GetProfileId();
-	static HRESULT Open(CBackupSet **ppList, UINT64 id, PCTSTR pszProfilePath, CContext *pContext);
+	virtual CString GetProfileId();
+	static HRESULT Open(CBackupSet **ppList, PCTSTR pszProfileId, PCTSTR pszProfilePath, CContext *pContext);
 
 protected:
 
-	UINT64 m_id;					// カレントID。
 	CBackupList m_listBackup;
 	CContext *m_pContext;
 	CString m_strProfilePath;
+	CString m_strProfileId;					// カレントID。
 
 	CBackupSetImpl();
 	virtual ~CBackupSetImpl();
@@ -85,8 +85,8 @@ public:
 	virtual HRESULT Delete();
 
 	static HRESULT Open(CBackup **ppBackup, PCTSTR pszFileName, CContext *pContext, CBackupSet *pSet);
-	static HRESULT FormatFname(PTSTR szFname, int cbFname, UINT64 id, SYSTEMTIME sTime, PCTSTR szName);
-	static HRESULT ScanFname(PCTSTR szFname, UINT64 &id, SYSTEMTIME &sTime, CString &strName);
+	static HRESULT FormatFname(PTSTR szFname, int cbFname, PCTSTR pszId, SYSTEMTIME sTime, PCTSTR szName);
+	static HRESULT ScanFname(PCTSTR szFname, CString &strId, SYSTEMTIME &sTime, CString &strName);
 
 protected:
 
@@ -95,7 +95,7 @@ protected:
 	CString m_strName;
 	CString m_strPath;
 	BOOL m_bReadOnly;
-	UINT64 m_id;
+	CString m_strId;
 	CContext *m_pContext;
 	CBackupSet *m_pSet;
 
@@ -153,13 +153,6 @@ HRESULT CContextImpl::OpenBackupSet()
 		}
 
 		CString strId = find.GetFileTitle();
-		if (strId.GetLength() != 16) {
-			continue;	// ???
-		}
-		UINT64 id = -1;
-		if (_stscanf_s(strId, _T("%016I64x"), &id) != 1) {
-			continue;	// 数値化できなかった。
-		}
 		CString strPath = find.GetFilePath();
 		strPath.TrimRight(_T("\\"));
 		strPath += _T("\\");
@@ -168,7 +161,7 @@ HRESULT CContextImpl::OpenBackupSet()
 		}
 
 		CComPtr <CBackupSet> pSet;
-		hr = CBackupSetImpl::Open(&pSet, id, strPath, this);
+		hr = CBackupSetImpl::Open(&pSet, strId, strPath, this);
 		if (FAILED(hr)) {
 			continue;
 		}
@@ -243,6 +236,7 @@ HRESULT CContextImpl::Open(CContext **ppContext)
 	if (FAILED(hr)) {
 		return hr;	// Personalの場所が取れない。
 	}
+
 	TCHAR path[_MAX_PATH], drive[_MAX_DRIVE], dir[_MAX_DIR], fname[_MAX_FNAME], ext[_MAX_EXT];
 	if (GetModuleFileName(NULL, path, numof(path)) == 0) {
 		return E_FAIL;	// モジュールのファイル名が取れない。
@@ -284,7 +278,6 @@ HRESULT CContextImpl::Open(CContext **ppContext)
 /////////////////////////////////////////////////////////////////////////////
 
 CBackupSetImpl::CBackupSetImpl()
-	: m_id(NULL)
 {
 
 }
@@ -315,9 +308,9 @@ CString CBackupSetImpl::GetProfilePath()
 	return m_strProfilePath;
 }
 
-UINT64 CBackupSetImpl::GetProfileId()
+CString CBackupSetImpl::GetProfileId()
 {
-	return m_id;
+	return m_strProfileId;
 }
 
 HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
@@ -334,7 +327,7 @@ HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 	SYSTEMTIME sTime;
 	CTime::GetCurrentTime().GetAsSystemTime(sTime);
 	TCHAR fname[_MAX_FNAME];
-	hr = CBackupImpl::FormatFname(fname, _MAX_FNAME, m_id, sTime, pszName);
+	hr = CBackupImpl::FormatFname(fname, _MAX_FNAME, m_strProfileId, sTime, pszName);
 	if (FAILED(hr)) {
 		return hr;
 	}
@@ -381,7 +374,7 @@ HRESULT CBackupSetImpl::RemoveBackup(CBackup *pBackup)
 	return S_OK;
 }
 
-HRESULT CBackupSetImpl::Open(CBackupSet **ppList, UINT64 id, PCTSTR pszProfilePath, CContext *pContext)
+HRESULT CBackupSetImpl::Open(CBackupSet **ppList, PCTSTR pszProfileId, PCTSTR pszProfilePath, CContext *pContext)
 {
 	HRESULT hr = S_OK;
 
@@ -390,9 +383,9 @@ HRESULT CBackupSetImpl::Open(CBackupSet **ppList, UINT64 id, PCTSTR pszProfilePa
 		return E_FAIL;
 	}
 
-	pThis->m_id = id;
-	pThis->m_pContext = pContext;
+	pThis->m_strProfileId = pszProfileId;
 	pThis->m_strProfilePath = pszProfilePath;
+	pThis->m_pContext = pContext;
 
 	CFileFind find;
 	BOOL bFound = find.FindFile(pContext->GetBackupPath() + _T("*.*"));
@@ -437,13 +430,13 @@ CBackupImpl::~CBackupImpl()
 
 }
 
-HRESULT CBackupImpl::FormatFname(PTSTR szFname, int cbFname, UINT64 id, SYSTEMTIME sTime, PCTSTR szName)
+HRESULT CBackupImpl::FormatFname(PTSTR szFname, int cbFname, PCTSTR pszId, SYSTEMTIME sTime, PCTSTR szName)
 {
 	try {
 		FILETIME fTime;
 		SystemTimeToFileTime(&sTime, &fTime);
 		UINT64 time = ((UINT64)fTime.dwHighDateTime << 32) | fTime.dwLowDateTime;
-		_stprintf_s(szFname, cbFname, PROFILE_FNAME_FORMAT, id, time);
+		_stprintf_s(szFname, cbFname, PROFILE_FNAME_FORMAT, pszId, time);
 		_tcscat_s(szFname, cbFname, szName);
 	}
 	catch (...) {
@@ -453,38 +446,32 @@ HRESULT CBackupImpl::FormatFname(PTSTR szFname, int cbFname, UINT64 id, SYSTEMTI
 	return S_OK;
 }
 
-HRESULT CBackupImpl::ScanFname(PCTSTR szFname, UINT64 &id, SYSTEMTIME &sTime, CString &strName)
+HRESULT CBackupImpl::ScanFname(PCTSTR szFname, CString &strId, SYSTEMTIME &sTime, CString &strName)
 {
-	TCHAR name[_MAX_FNAME] = { NULL };
-	UINT64 _id = -1;
-	UINT64 time = -1;
-	FILETIME fTime;
+	CString strFname = szFname;
 
-	try {
-		_stscanf_s(szFname, PROFILE_FNAME_FORMAT, &_id, &time);
-	}
-	catch (...) {
+	int nSep1 = strFname.Find(_T("_"));	// first separator
+	if (nSep1 == -1) {
 		return E_FAIL;
 	}
+	strId = strFname.Mid(0, nSep1);
 
+	int nSep2 = strFname.Find(_T("_"), nSep1 + 1);
+	if (nSep2 == -1) {
+		return E_FAIL;
+	}
+	CString strTime = strFname.Mid(nSep1 + 1, nSep2 - (nSep1 + 1));
+	UINT64 time = -1;
+	_stscanf_s(strTime, _T("%016I64x"), &time);
 	if (time == -1) {
 		return E_FAIL;
 	}
-
-	try {
-		TCHAR temp[_MAX_FNAME];
-		_stprintf_s(temp, PROFILE_FNAME_FORMAT, _id, time);
-		_tcscpy_s(name, szFname + _tcslen(temp));
-	}
-	catch (...) {
-		return E_FAIL;
-	}
-
-	id = _id;
+	FILETIME fTime;
 	fTime.dwHighDateTime = (UINT32)(time >> 32);
 	fTime.dwLowDateTime = (UINT32)time;
 	FileTimeToSystemTime(&fTime, &sTime);
-	strName = name;
+
+	strName = strFname.Mid(nSep2 + 1);
 
 	return S_OK;
 }
@@ -515,7 +502,7 @@ HRESULT CBackupImpl::SetName(PCTSTR pszName)
 	TCHAR fname[_MAX_FNAME];
 	SYSTEMTIME sTime;
 	m_dateCreate.GetAsSystemTime(sTime);
-	hr = CBackupImpl::FormatFname(fname, _MAX_FNAME, m_id, sTime, pszName);
+	hr = CBackupImpl::FormatFname(fname, _MAX_FNAME, m_pSet->GetProfileId(), sTime, pszName);
 	if (FAILED(hr)) {
 		return hr;
 	}
@@ -668,15 +655,15 @@ HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, CContext *pContext
 
 	strPath += _T("\\");	// \を戻す。
 
-	UINT64 id;
+	CString strId;
 	SYSTEMTIME sTime;
 	CString strName;
-	hr = ScanFname(fname, id, sTime, strName);
+	hr = ScanFname(fname, strId, sTime, strName);
 	if (FAILED(hr)) {
 		return hr;
 	}
 
-	if (id != pSet->GetProfileId()) {
+	if (strId != pSet->GetProfileId()) {
 		return E_FAIL;
 	}
 
@@ -703,7 +690,7 @@ HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, CContext *pContext
 	pThis->m_dateSL2 = sTimeSL2;
 	pThis->m_strPath = strPath;
 	pThis->m_strName = strName;
-	pThis->m_id = id;
+	pThis->m_strId = strId;
 	pThis->m_bReadOnly = FALSE;
 	pThis->m_pContext = pContext;
 	pThis->m_pSet = pSet;

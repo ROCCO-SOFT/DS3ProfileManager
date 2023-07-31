@@ -47,6 +47,9 @@ ER Profile Manager(Alpha) Release Notes
  0.0.1 (2023/07/31)
     - First release 
 
+ 0.0.2 (2023/08/01)
+    - Changed profile ID management method
+
 
 6. Disclaimer
 
