@@ -41,7 +41,7 @@ protected:
 	CContextImpl();
 	virtual ~CContextImpl();
 	HRESULT OpenBackupSet();
-	static HRESULT GetFolderPath(int id, CString &strRet);
+	static HRESULT GetSpecialFolderPath(int id, CString &strRet);
 
 };
 
@@ -55,6 +55,7 @@ public:
 	virtual HRESULT SaveCurrent(CBackup **ppBackup, PCTSTR pszName);
 	virtual HRESULT RemoveBackup(CBackup *pBackup);
 	virtual CString GetProfilePath();
+	virtual UINT64 GetProfileId();
 	static HRESULT Open(CBackupSet **ppList, UINT64 id, PCTSTR pszProfilePath, CContext *pContext);
 
 protected:
@@ -83,7 +84,7 @@ public:
 	virtual HRESULT Save();
 	virtual HRESULT Delete();
 
-	static HRESULT Open(CBackup **ppBackup, PCTSTR pszFileName, UINT64 idDefault, CContext *pContext, CBackupSet *pSet);
+	static HRESULT Open(CBackup **ppBackup, PCTSTR pszFileName, CContext *pContext, CBackupSet *pSet);
 	static HRESULT FormatFname(PTSTR szFname, int cbFname, UINT64 id, SYSTEMTIME sTime, PCTSTR szName);
 	static HRESULT ScanFname(PCTSTR szFname, UINT64 &id, SYSTEMTIME &sTime, CString &strName);
 
@@ -151,17 +152,23 @@ HRESULT CContextImpl::OpenBackupSet()
 			continue;
 		}
 
+		CString strId = find.GetFileTitle();
+		if (strId.GetLength() != 16) {
+			continue;	// ???
+		}
 		UINT64 id = -1;
-		if (_stscanf_s(find.GetFileTitle(), _T("%016I64x"), &id) != 1) {
+		if (_stscanf_s(strId, _T("%016I64x"), &id) != 1) {
 			continue;	// 数値化できなかった。
 		}
-
-		CString path = find.GetFilePath();
-		path.TrimRight(_T("\\"));
-		path += _T("\\");
+		CString strPath = find.GetFilePath();
+		strPath.TrimRight(_T("\\"));
+		strPath += _T("\\");
+		if (!PathFileExists(strPath + SL2_FILE_NAME)) {
+			continue;	// SL2ファイルが見つからない。
+		}
 
 		CComPtr <CBackupSet> pSet;
-		hr = CBackupSetImpl::Open(&pSet, id, path, this);
+		hr = CBackupSetImpl::Open(&pSet, id, strPath, this);
 		if (FAILED(hr)) {
 			continue;
 		}
@@ -187,20 +194,33 @@ CString CContextImpl::GetBackupPath()
 	return m_strBackupPath;
 }
 
-HRESULT CContextImpl::GetFolderPath(int id, CString &strRet)
+HRESULT CContextImpl::GetSpecialFolderPath(int id, CString &strRet)
 {
-	LPITEMIDLIST pidl;
-	if (SHGetSpecialFolderLocation(NULL, id, &pidl) != NOERROR) {
+	HRESULT hr = S_OK;
+	LPITEMIDLIST pidl = NULL;
+	if ((SHGetSpecialFolderLocation(NULL, id, &pidl) != NOERROR)
+		|| !pidl) {
 		return E_FAIL;
 	}
-	SHGetPathFromIDList(pidl, strRet.GetBuffer(MAX_PATH));
-	strRet.ReleaseBuffer();
+	CString strPath;
+	do {
+		if (!SHGetPathFromIDList(pidl, strPath.GetBuffer(MAX_PATH))) {
+			hr = E_FAIL;
+			break;
+		}
+		strPath.ReleaseBuffer();
+	} while (0);
 	CoTaskMemFree(pidl);
-	strRet.TrimRight(_T("\\"));
-	strRet += _T("\\");
-	if (!PathFileExists(strRet)) {
+	pidl = NULL;
+	if (FAILED(hr)) {
+		return hr;
+	}
+	strPath.TrimRight(_T("\\"));
+	strPath += _T("\\");
+	if (!PathFileExists(strPath)) {
 		return E_FAIL;
 	}
+	strRet = strPath;
 	return S_OK;
 }
 
@@ -209,31 +229,28 @@ HRESULT CContextImpl::Open(CContext **ppContext)
 	HRESULT hr = S_OK;
 
 	CString strProfile;
-	hr = GetFolderPath(CSIDL_APPDATA, strProfile);
+	hr = GetSpecialFolderPath(CSIDL_APPDATA, strProfile);
 	if (FAILED(hr)) {
 		return hr;	// AppDataの場所が取れない。
 	}
-
-	strProfile += PROFILE_FOLDER;
+	strProfile += PROFILE_FOLDER_NAME _T("\\");
 	if (!PathFileExists(strProfile)) {
 		return E_FAIL;	// プロファイルが見つからない。
 	}
 
 	CString strBackup;
-	hr = GetFolderPath(CSIDL_PERSONAL, strBackup);
+	hr = GetSpecialFolderPath(CSIDL_PERSONAL, strBackup);
 	if (FAILED(hr)) {
 		return hr;	// Personalの場所が取れない。
 	}
-
-#if 0
-	strBackup += APP_PROFILE_FOLDER;
-#else
 	TCHAR path[_MAX_PATH], drive[_MAX_DRIVE], dir[_MAX_DIR], fname[_MAX_FNAME], ext[_MAX_EXT];
-	GetModuleFileName(NULL, path, numof(path));
+	if (GetModuleFileName(NULL, path, numof(path)) == 0) {
+		return E_FAIL;	// モジュールのファイル名が取れない。
+	}
 	_tsplitpath_s(path, drive, dir, fname, ext);
 	strBackup += fname;
 	strBackup +=_T("\\");
-#endif
+
 	if (!PathFileExists(strBackup)) {
 		if (!CreateDirectory(strBackup, NULL)) {
 			return E_FAIL;	// バックアップフォルダが作れない。
@@ -298,6 +315,11 @@ CString CBackupSetImpl::GetProfilePath()
 	return m_strProfilePath;
 }
 
+UINT64 CBackupSetImpl::GetProfileId()
+{
+	return m_id;
+}
+
 HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 {
 	HRESULT hr = S_OK;
@@ -334,7 +356,7 @@ HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 	SHFileOperation(&fos);
 
 	CComPtr <CBackup> pBackup;
-	hr = CBackupImpl::Open(&pBackup, strTo, m_id, m_pContext, this);
+	hr = CBackupImpl::Open(&pBackup, strTo, m_pContext, this);
 	if (FAILED(hr)) {
 		return hr;
 	}
@@ -383,12 +405,12 @@ HRESULT CBackupSetImpl::Open(CBackupSet **ppList, UINT64 id, PCTSTR pszProfilePa
 			continue;
 		}
 
-		CString path = find.GetFilePath();
-		path.TrimRight(_T("\\"));
-		path += _T("\\");
+		CString szPath = find.GetFilePath();
+		szPath.TrimRight(_T("\\"));
+		szPath += _T("\\");
 
 		CComPtr <CBackup> pBackup;
-		hr = CBackupImpl::Open(&pBackup, path, pThis->m_id, pContext, pThis);
+		hr = CBackupImpl::Open(&pBackup, szPath, pContext, pThis);
 		if (FAILED(hr)) {
 			continue;
 		}
@@ -592,8 +614,10 @@ HRESULT CBackupImpl::Save()
 
 	WIN32_FILE_ATTRIBUTE_DATA attr = { NULL };
 	GetFileAttributesEx(strSL2, GetFileExInfoStandard, &attr);
+	FILETIME ftLocal;
+	FileTimeToLocalFileTime(&attr.ftLastWriteTime, &ftLocal);
 	SYSTEMTIME sTimeSL2;
-	FileTimeToSystemTime(&attr.ftLastWriteTime, &sTimeSL2);
+	FileTimeToSystemTime(&ftLocal, &sTimeSL2);
 	m_dateSL2 = sTimeSL2;
 
 	return S_OK;
@@ -628,7 +652,7 @@ HRESULT CBackupImpl::Delete()
 	return S_OK;
 }
 
-HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, UINT64 idDefault, CContext *pContext, CBackupSet *pSet)
+HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, CContext *pContext, CBackupSet *pSet)
 {
 	HRESULT hr = S_OK;
 
@@ -652,10 +676,8 @@ HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, UINT64 idDefault, 
 		return hr;
 	}
 
-	if (idDefault != -1) {
-		if (id != idDefault) {
-			return E_FAIL;
-		}
+	if (id != pSet->GetProfileId()) {
+		return E_FAIL;
 	}
 
 #if 1
@@ -666,8 +688,10 @@ HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, UINT64 idDefault, 
 
 	WIN32_FILE_ATTRIBUTE_DATA attr = { NULL };
 	GetFileAttributesEx(strSL2, GetFileExInfoStandard, &attr);
+	FILETIME ftLocal;
+	FileTimeToLocalFileTime(&attr.ftLastWriteTime, &ftLocal);
 	SYSTEMTIME sTimeSL2;
-	FileTimeToSystemTime(&attr.ftLastWriteTime, &sTimeSL2);
+	FileTimeToSystemTime(&ftLocal, &sTimeSL2);
 #endif
 
 	CComPtr <CBackupImpl> pThis = new CBackupImpl;

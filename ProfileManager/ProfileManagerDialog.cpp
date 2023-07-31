@@ -113,6 +113,14 @@ BOOL CProfileManagerDialog::OnInitDialog()
 			pSysMenu->AppendMenu(MF_SEPARATOR);
 			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
 		}
+
+		CString strReadmeMenu;
+		bNameValid = strReadmeMenu.LoadString(IDS_README);
+		ASSERT(bNameValid);
+		if (!strReadmeMenu.IsEmpty())
+		{
+			pSysMenu->AppendMenu(MF_STRING, IDM_README, strReadmeMenu);
+		}
 	}
 
 	hr = CreateContext(&m_pContext);
@@ -183,7 +191,21 @@ void CProfileManagerDialog::OnSysCommand(UINT nID, LPARAM lParam)
 		CAboutDlg dlgAbout;
 		dlgAbout.DoModal();
 	}
-	else
+	else if ((nID & 0xFFF0) == IDM_README)
+	{
+		TCHAR path[_MAX_PATH];
+		GetModuleFileName(NULL, path, _MAX_PATH);
+		TCHAR drive[_MAX_DRIVE], dir[_MAX_DIR], fname[_MAX_FNAME], ext[_MAX_EXT];
+		_tsplitpath_s(path, drive, dir, fname, ext);
+		CString strReadmeFileName;
+		strReadmeFileName.LoadString(IDS_README_FILE_NAME);
+		CString strReadmePathName;
+		strReadmePathName += drive;
+		strReadmePathName += dir;
+		strReadmePathName += strReadmeFileName;
+		ShellExecute(GetSafeHwnd(), _T("open"), strReadmePathName, NULL, NULL, SW_SHOWNORMAL);
+	}
+	else 
 	{
 		CDialogEx::OnSysCommand(nID, lParam);
 	}
@@ -239,7 +261,7 @@ void CProfileManagerDialog::OnBnClickedOverwriteButton()
 		return;
 	}
 
-	UINT nPrompt = AfxMessageBox(IDS_OVERWRITE_CONFIRM, MB_OKCANCEL | MB_ICONQUESTION);
+	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_OVERWRITE, MB_OKCANCEL | MB_ICONQUESTION);
 	if (nPrompt == IDCANCEL) {
 		return;
 	}
@@ -264,7 +286,7 @@ void CProfileManagerDialog::OnBnClickedLoadButton()
 		return;
 	}
 
-	UINT nPrompt = AfxMessageBox(IDS_LOAD_CONFIRM, MB_OKCANCEL | MB_ICONQUESTION);
+	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_LOAD, MB_OKCANCEL | MB_ICONQUESTION);
 	if (nPrompt == IDCANCEL) {
 		return;
 	}
@@ -288,7 +310,7 @@ void CProfileManagerDialog::OnBnClickedRemoveButton()
 		return;
 	}
 
-	UINT nPrompt = AfxMessageBox(IDS_DELETE_CONFIRM, MB_OKCANCEL | MB_ICONQUESTION);
+	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_DELETE, MB_OKCANCEL | MB_ICONQUESTION);
 	if (nPrompt == IDCANCEL) {
 		return;
 	}
@@ -411,16 +433,25 @@ void CProfileManagerDialog::OnLvnEndlabeleditProfileList(NMHDR *pNMHDR, LRESULT 
 	HRESULT hr = S_OK;
 
 	NMLVDISPINFO *pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
-
 	if (!pDispInfo->item.pszText) {
 		return;
 	}
 
 	int nItem = pDispInfo->item.iItem;
+	CString strText = pDispInfo->item.pszText;
+	strText.Trim(_T(" "));
+	const CString strNg = _T("\\/:*?\"<>|");
+	if (strText.FindOneOf(strNg) != -1) {
+		CString strErr;
+		strErr.LoadString(IDS_ERROR_INVALID_CHARACTER);
+		strErr += _T("\n") + strNg;
+		AfxMessageBox(strErr, MB_OK | MB_ICONEXCLAMATION);
+		return;
+	}
 
 	CBackup *pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
-	hr = pBackup->SetName(pDispInfo->item.pszText);
-	m_listProfile.SetItemText(nItem, 0, pDispInfo->item.pszText);
+	hr = pBackup->SetName(strText);
+	m_listProfile.SetItemText(nItem, 0, strText);
 
 	*pResult = 0;
 }

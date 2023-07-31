@@ -5,6 +5,16 @@ VisualStudioVersion = 15.0.33529.398
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProfileManager", "ProfileManager\ProfileManager.vcxproj", "{AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF}"
 EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "DS3ProfileManagerSetup", "DS3ProfileManagerSetup\DS3ProfileManagerSetup.vdproj", "{BC52DABF-1899-48E8-B0AF-0D0FE1706891}"
+	ProjectSection(ProjectDependencies) = postProject
+		{AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF} = {AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF}
+	EndProjectSection
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "ERProfileManagerSetup", "ERProfileManagerSetup\ERProfileManagerSetup.vdproj", "{A2717C69-7822-47AF-919F-42F7D5DB9128}"
+	ProjectSection(ProjectDependencies) = postProject
+		{AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF} = {AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -27,6 +37,28 @@ Global
 		{AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF}.ER-Release|x64.Build.0 = ER-Release|x64
 		{AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF}.Release|x64.ActiveCfg = Release|x64
 		{AF0BDD99-FB13-450C-B97A-9DD76C3CE1AF}.Release|x64.Build.0 = Release|x64
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.Debug|x64.ActiveCfg = DS3-Debug
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.Debug|x64.Build.0 = DS3-Debug
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.DS3-Debug|x64.ActiveCfg = DS3-Debug
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.DS3-Debug|x64.Build.0 = DS3-Debug
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.DS3-Release|x64.ActiveCfg = DS3-Release
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.DS3-Release|x64.Build.0 = DS3-Release
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.ER-Debug|x64.ActiveCfg = DS3-Release
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.ER-Debug|x64.Build.0 = DS3-Release
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.ER-Release|x64.ActiveCfg = DS3-Release
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.Release|x64.ActiveCfg = DS3-Release
+		{BC52DABF-1899-48E8-B0AF-0D0FE1706891}.Release|x64.Build.0 = DS3-Release
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.Debug|x64.ActiveCfg = ER-Debug
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.Debug|x64.Build.0 = ER-Debug
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.DS3-Debug|x64.ActiveCfg = ER-Release
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.DS3-Debug|x64.Build.0 = ER-Release
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.DS3-Release|x64.ActiveCfg = ER-Release
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.ER-Debug|x64.ActiveCfg = ER-Debug
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.ER-Debug|x64.Build.0 = ER-Debug
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.ER-Release|x64.ActiveCfg = ER-Release
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.ER-Release|x64.Build.0 = ER-Release
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.Release|x64.ActiveCfg = ER-Release
+		{A2717C69-7822-47AF-919F-42F7D5DB9128}.Release|x64.Build.0 = ER-Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

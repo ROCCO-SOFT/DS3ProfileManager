@@ -15,10 +15,10 @@ enum PROFILE_ERROR
 
 #define PROFILE_FNAME_FORMAT	_T("%016I64x_%016I64x_")
 #ifdef _DS3
-#define PROFILE_FOLDER			_T("DarkSoulsIII\\")
+#define PROFILE_FOLDER_NAME		_T("DarkSoulsIII")
 #define SL2_FILE_NAME			_T("DS30000.sl2")
 #elif _ER
-#define PROFILE_FOLDER			_T("EldenRing\\")
+#define PROFILE_FOLDER_NAME		_T("EldenRing")
 #define SL2_FILE_NAME			_T("ER0000.sl2")
 #endif
 
@@ -45,6 +45,7 @@ public:
 	virtual HRESULT SaveCurrent(CBackup **ppBackup, PCTSTR pszName) = 0;
 	virtual HRESULT RemoveBackup(CBackup *pBackup) = 0;
 	virtual CString GetProfilePath() = 0;
+	virtual UINT64 GetProfileId() = 0;
 
 };
 

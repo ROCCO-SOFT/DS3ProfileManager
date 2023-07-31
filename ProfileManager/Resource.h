@@ -3,15 +3,19 @@
 // ProfileManager.rc で使用
 //
 #define IDM_ABOUTBOX                    0x0010
+#define IDM_README                      0x0020
 #define IDD_ABOUTBOX                    100
 #define IDS_ABOUTBOX                    101
 #define IDD_PROFILE_MANAGER             102
-#define IDS_OVERWRITE_CONFIRM           103
-#define IDS_DELETE_CONFIRM              104
-#define IDS_LOAD_CONFIRM                105
+#define IDS_README_FILE_NAME            102
+#define IDS_CONFIRM_OVERWRITE           103
+#define IDS_CONFIRM_DELETE              104
+#define IDS_CONFIRM_LOAD                105
 #define IDS_LIST_HEADER_NAME            106
 #define IDS_LIST_HEADER_DATE            107
 #define IDS_LIST_HEADER_STATUS          108
+#define IDS_ERROR_INVALID_CHARACTER     109
+#define IDS_README                      110
 #define IDC_PROFILE_LIST                1002
 #define IDC_LOAD_BUTTON                 1005
 #define IDC_SAVE_BUTTON                 1006
