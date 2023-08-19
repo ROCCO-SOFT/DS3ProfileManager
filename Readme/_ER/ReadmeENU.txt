@@ -50,6 +50,9 @@ ER Profile Manager(Alpha) Release Notes
  0.0.2 (2023/08/01)
     - Changed profile ID management method
 
+ 0.0.3 (2023/08/11)
+    - Fixed a bug that the app crashes after saving
+
 
 6. Disclaimer
 

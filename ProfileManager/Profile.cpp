@@ -53,6 +53,7 @@ public:
 
 	virtual HRESULT EnumBackup(CBackupEnum **ppEnum);
 	virtual HRESULT SaveCurrent(CBackup **ppBackup, PCTSTR pszName);
+	virtual HRESULT AddBackup(CBackup *pBackup);
 	virtual HRESULT RemoveBackup(CBackup *pBackup);
 	virtual CString GetProfilePath();
 	virtual CString GetProfileId();
@@ -354,9 +355,20 @@ HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 		return hr;
 	}
 
+	hr = AddBackup(pBackup);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
 	*ppBackup = pBackup;
 	(*ppBackup)->AddRef();
 
+	return S_OK;
+}
+
+HRESULT CBackupSetImpl::AddBackup(CBackup *pBackup)
+{
+	m_listBackup.push_back(pBackup);
 	return S_OK;
 }
 

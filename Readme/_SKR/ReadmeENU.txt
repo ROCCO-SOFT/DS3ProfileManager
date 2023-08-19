@@ -1,9 +1,9 @@
-DS3 Profile Manager(Alpha) Release Notes 
+SKR Profile Manager(Alpha) Release Notes 
 
 
 1. About this app 
 
-  This app is an application that allows you to save the save data of the STEAM version of DARK SOULS 3 to the HDD and return it to the game with simple operations. 
+  This app is an application that allows you to save the save data of the STEAM version of SEKIRO to the HDD and return it to the game with simple operations. 
   Save your save data frequently during gameplay to prepare for unforeseen circumstances. 
   You can save multiple save data, so you can create data for Boss Rush. 
 
@@ -13,18 +13,18 @@ DS3 Profile Manager(Alpha) Release Notes
   OS Windows 10, 11 64bit or later 
   Memory 8GByte or more 
   HDD free space 1GByte or more 
-  STEAM version DARK SOULS 3 must be installed. 
+  STEAM version ELDEN RING must be installed. 
 
 
 3. Install
 
-  Run DS3ProfileManager.msi. Please follow the instructions on the screen to install. 
+  Run SKRProfileManager.msi. Please follow the instructions on the screen to install. 
 
  
 4. How to operate 
 
-  a. To start DS3 Profile Manager
-     Click [DS3 Profile Manager] from the Windows start menu.
+  a. To start SKR Profile Manager
+     Click [SKR Profile Manager] from the Windows start menu.
  
   b. To save the save data while playing the game
      Click the [Save] button at the bottom of the window.* 
@@ -71,7 +71,7 @@ DS3 Profile Manager(Alpha) Release Notes
 8. Trademarks and License 
 
   Windows, Windows10 and Windows11, DirectX are trademarks of Microsoft. 
-  DARK SOULS, DARK SOULS3 are trademarks of FromSoftware. 
+  SEKIRO is a trademark of FromSoftware. 
   STEAM is a trademark of Valve Corporation. 
 
 

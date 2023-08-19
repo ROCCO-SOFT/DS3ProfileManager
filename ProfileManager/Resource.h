@@ -10,6 +10,7 @@
 #define IDS_README_FILE_NAME            102
 #define IDS_CONFIRM_OVERWRITE           103
 #define IDD_ABOUTBOX1                   103
+#define IDD_PROFILE_MANAGER1            103
 #define IDS_CONFIRM_DELETE              104
 #define IDS_CONFIRM_LOAD                105
 #define IDS_LIST_HEADER_NAME            106

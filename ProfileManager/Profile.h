@@ -20,6 +20,9 @@ enum PROFILE_ERROR
 #elif _ER
 #define PROFILE_FOLDER_NAME		_T("EldenRing")
 #define SL2_FILE_NAME			_T("ER0000.sl2")
+#elif _SKR
+#define PROFILE_FOLDER_NAME		_T("Sekiro")
+#define SL2_FILE_NAME			_T("S0000.sl2")
 #endif
 
 class CContext;
@@ -43,6 +46,7 @@ public:
 
 	virtual HRESULT EnumBackup(CBackupEnum **ppEnum) = 0;
 	virtual HRESULT SaveCurrent(CBackup **ppBackup, PCTSTR pszName) = 0;
+	virtual HRESULT AddBackup(CBackup *pBackup) = 0;
 	virtual HRESULT RemoveBackup(CBackup *pBackup) = 0;
 	virtual CString GetProfilePath() = 0;
 	virtual CString GetProfileId() = 0;
