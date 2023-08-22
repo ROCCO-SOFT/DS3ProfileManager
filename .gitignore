@@ -260,3 +260,12 @@ paket-files/
 __pycache__/
 *.pyc
 /Package
+/enc_temp_folder
+/ProfileManager/x64
+/DS3ProfileManagerSetup/DS3-Debug
+/DS3ProfileManagerSetup/DS3-Release
+/ERProfileManagerSetup/ER-Debug
+/ERProfileManagerSetup/ER-Release
+/SKRProfileManagerSetup/SKR-Debug
+/SKRProfileManagerSetup/SKR-Release
+/x64
