@@ -57,6 +57,11 @@ public:
 	virtual HRESULT RemoveBackup(CBackup *pBackup);
 	virtual CString GetProfilePath();
 	virtual CString GetProfileId();
+	virtual HRESULT DoAutoSave(int nMaxAutosaves);
+	virtual HRESULT RegisterCallback(CBackupSetCallback *pCallback);
+	virtual HRESULT UnregisterCallback(CBackupSetCallback *pCallback);
+	virtual HRESULT LoadIndexList();
+	virtual HRESULT SaveIndexList();
 	static HRESULT Open(CBackupSet **ppList, PCTSTR pszProfileId, PCTSTR pszProfilePath, CContext *pContext);
 
 protected:
@@ -65,9 +70,14 @@ protected:
 	CContext *m_pContext;
 	CString m_strProfilePath;
 	CString m_strProfileId;					// カレントID。
+	CTime m_timeLatestSave;
+	std::map <CBackupSetCallback *, CBackupSetCallback *> m_listCallback;
 
 	CBackupSetImpl();
 	virtual ~CBackupSetImpl();
+	HRESULT UpdateBackupIndex(CBackupList::iterator it);
+	static bool CompareBackupDate(CBackup *p1, CBackup *p2);
+	static bool CompareBackupIndex(CBackup *p1, CBackup *p2);
 
 };
 
@@ -84,6 +94,9 @@ public:
 	virtual HRESULT Load();
 	virtual HRESULT Save();
 	virtual HRESULT Delete();
+	virtual HRESULT IsAutosaved();
+	virtual int GetIndex();
+	virtual HRESULT SetIndex(int nIndex);
 
 	static HRESULT Open(CBackup **ppBackup, PCTSTR pszFileName, CContext *pContext, CBackupSet *pSet);
 	static HRESULT FormatFname(PTSTR szFname, int cbFname, PCTSTR pszId, SYSTEMTIME sTime, PCTSTR szName);
@@ -99,6 +112,7 @@ protected:
 	CString m_strId;
 	CContext *m_pContext;
 	CBackupSet *m_pSet;
+	int m_nIndex;
 
 	CBackupImpl();
 	virtual ~CBackupImpl();
@@ -113,12 +127,13 @@ public:
 
 	virtual HRESULT Next(CBackup **ppBackup);
 	virtual HRESULT Reset();
-	static HRESULT Open(CBackupEnum **ppEnum, CBackupList *pList);
+	static HRESULT Open(CBackupEnum **ppEnum, CBackupList *pList, CBackupSetImpl *pSet);
 
 protected:
 
 	CBackupList::iterator m_it;
-	CBackupList *m_pList;
+	CBackupList m_list;
+	CComPtr <CBackupSetImpl> m_pSet;
 
 	CBackupEnumImpl();
 	virtual ~CBackupEnumImpl();
@@ -157,7 +172,7 @@ HRESULT CContextImpl::OpenBackupSet()
 		CString strPath = find.GetFilePath();
 		strPath.TrimRight(_T("\\"));
 		strPath += _T("\\");
-		if (!PathFileExists(strPath + SL2_FILE_NAME)) {
+		if (!PathFileExists(strPath + SL2_FILE)) {
 			continue;	// SL2ファイルが見つからない。
 		}
 
@@ -223,11 +238,11 @@ HRESULT CContextImpl::Open(CContext **ppContext)
 	HRESULT hr = S_OK;
 
 	CString strProfile;
-	hr = GetSpecialFolderPath(CSIDL_APPDATA, strProfile);
+	hr = GetSpecialFolderPath(PROFILE_FOLDER_ID, strProfile);
 	if (FAILED(hr)) {
 		return hr;	// AppDataの場所が取れない。
 	}
-	strProfile += PROFILE_FOLDER_NAME _T("\\");
+	strProfile += PROFILE_FOLDER _T("\\");
 	if (!PathFileExists(strProfile)) {
 		return E_FAIL;	// プロファイルが見つからない。
 	}
@@ -293,7 +308,7 @@ HRESULT CBackupSetImpl::EnumBackup(CBackupEnum **ppEnum)
 	HRESULT hr = S_OK;
 
 	CComPtr <CBackupEnum> pEnum;
-	hr = CBackupEnumImpl::Open(&pEnum, &m_listBackup);
+	hr = CBackupEnumImpl::Open(&pEnum, &m_listBackup, this);
 	if (FAILED(hr)) {
 		return hr;
 	}
@@ -314,6 +329,183 @@ CString CBackupSetImpl::GetProfileId()
 	return m_strProfileId;
 }
 
+HRESULT CBackupSetImpl::DoAutoSave(int nMaxAutosaves)
+{
+	HRESULT hr = S_OK;
+
+#if 1
+	CString strSL2 = m_strProfilePath + SL2_FILE;
+	if (!PathFileExists(strSL2)) {
+		return E_FAIL;
+	}
+
+	WIN32_FILE_ATTRIBUTE_DATA attr = { NULL };
+	GetFileAttributesEx(strSL2, GetFileExInfoStandard, &attr);
+	FILETIME ftLocal;
+	FileTimeToLocalFileTime(&attr.ftLastWriteTime, &ftLocal);
+	SYSTEMTIME sTimeSL2;
+	FileTimeToSystemTime(&ftLocal, &sTimeSL2);
+#endif
+
+	CTime time(sTimeSL2);
+	if (time > m_timeLatestSave) {
+		CComPtr <CBackup> pBackup;
+		hr = SaveCurrent(&pBackup, AUTOSAVE_NAME);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+#if 1
+		CBackupList listAutosaved;
+		auto it = m_listBackup.begin();
+		while (it != m_listBackup.end()) {
+			if ((*it)->IsAutosaved()) {
+				listAutosaved.push_back(*it);
+			}
+			it++;
+		}
+		if (listAutosaved.size() > nMaxAutosaves) {
+			listAutosaved.sort(CompareBackupDate);
+			auto it = listAutosaved.begin();
+			while ((listAutosaved.size() > nMaxAutosaves)
+				&& (it != listAutosaved.end())) {
+				CComPtr <CBackup> pErase;
+				pErase = *(it++);
+				auto itFound = std::find(m_listBackup.begin(), m_listBackup.end(), pErase);
+				if (itFound != m_listBackup.end()) {
+					for (auto it = m_listCallback.begin(); it != m_listCallback.end(); it++) {
+						CBackupSetCallback *pCallback = it->second;
+						pCallback->BackupSetAutoSaveParged(this, pErase);
+					}
+					m_listBackup.erase(itFound);
+				}
+				hr = pErase->Delete();
+				if (FAILED(hr)) {
+					return hr;
+				}
+				it = listAutosaved.erase(it);
+			}
+		}
+#endif
+
+#if 1
+		{
+			WIN32_FILE_ATTRIBUTE_DATA attr = { NULL };
+			GetFileAttributesEx(strSL2, GetFileExInfoStandard, &attr);
+			FILETIME ftLocal;
+			FileTimeToLocalFileTime(&attr.ftLastWriteTime, &ftLocal);
+			SYSTEMTIME sTimeSL2;
+			FileTimeToSystemTime(&ftLocal, &sTimeSL2);
+
+			CTime time2(sTimeSL2);
+			if (time2 > time) {
+				// It seems that it was updated while backing up.
+				pBackup->Delete();
+				return E_FAIL;
+			}
+		}
+#endif
+
+		for (auto it = m_listCallback.begin(); it != m_listCallback.end(); it++) {
+			CBackupSetCallback *pCallback = it->second;
+			pCallback->BackupSetAutoSaveSaved(this, pBackup);
+		}
+	}
+
+	return S_OK;
+}
+
+HRESULT CBackupSetImpl::RegisterCallback(CBackupSetCallback *pCallback)
+{
+	auto it = m_listCallback.find(pCallback);
+	if (it != m_listCallback.end()) {
+		return E_FAIL;
+	}
+
+	m_listCallback[pCallback] = pCallback;
+
+	return S_OK;
+}
+
+HRESULT CBackupSetImpl::UnregisterCallback(CBackupSetCallback *pCallback)
+{
+	auto it = m_listCallback.find(pCallback);
+	if (it == m_listCallback.end()) {
+		return E_FAIL;
+	}
+
+	it = m_listCallback.erase(it);
+
+	return S_OK;
+}
+
+HRESULT CBackupSetImpl::UpdateBackupIndex(CBackupList::iterator it)
+{
+	int nIndex = 0;
+	while (it != m_listBackup.end()) {
+		(*it)->SetIndex(nIndex++);
+		it++;
+	}
+	return S_OK;
+}
+
+HRESULT CBackupSetImpl::LoadIndexList()
+{
+	CString strFileName = m_pContext->GetBackupPath() + m_strProfileId + ORDER_INDEX_FILE;
+	if (!PathFileExists(strFileName)) {
+		return S_OK;
+	}
+	CStdioFile file;
+	if (!file.Open(strFileName, CFile::modeRead | CFile::typeText | CFile::typeUnicode)) {
+		return E_FAIL;
+	}
+
+	CBackupList list = m_listBackup;
+	CBackupList listNew;
+	CString strPath;
+	while (file.ReadString(strPath)) {
+		auto it = list.begin();
+		while (it != list.end()) {
+			if (_tcsicmp(strPath, (*it)->GetPath()) == 0) {
+				listNew.push_back(*it);
+				it = list.erase(it);
+				break;
+			}
+			it++;
+		}
+	}
+	if (!list.empty()) {
+		listNew.insert(listNew.end(), list.begin(), list.end());
+	}
+	if (!listNew.empty()) {
+		m_listBackup = listNew;
+	}
+
+	UpdateBackupIndex(m_listBackup.begin());
+
+	return S_OK;
+}
+
+HRESULT CBackupSetImpl::SaveIndexList()
+{
+	CString strFileName = m_pContext->GetBackupPath() + m_strProfileId + ORDER_INDEX_FILE;
+	CStdioFile file;
+	if (!file.Open(strFileName, CFile::modeReadWrite | CFile::typeText | CFile::modeCreate | CFile::typeUnicode)) {
+		return E_FAIL;
+	}
+
+	CBackupList list = m_listBackup;
+	list.sort(CompareBackupIndex);
+	auto it = list.begin();
+	while (it != list.end()) {
+		file.WriteString((*it)->GetPath() + _T("\n"));
+		it++;
+	}
+
+	return S_OK;
+}
+
+
 HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 {
 	HRESULT hr = S_OK;
@@ -332,7 +524,8 @@ HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 	if (FAILED(hr)) {
 		return hr;
 	}
-	CString strTo = m_pContext->GetBackupPath() + fname;
+	CString strTo = m_pContext->GetBackupPath();
+	strTo += fname;
 
 	strFrom += _T("\t");
 	strTo += _T("\t");
@@ -360,6 +553,10 @@ HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 		return hr;
 	}
 
+	if (m_timeLatestSave < pBackup->GetCreateTime()) {
+		m_timeLatestSave = pBackup->GetCreateTime();
+	}
+
 	*ppBackup = pBackup;
 	(*ppBackup)->AddRef();
 
@@ -368,7 +565,11 @@ HRESULT CBackupSetImpl::SaveCurrent(CBackup **ppBackup, PCTSTR pszName)
 
 HRESULT CBackupSetImpl::AddBackup(CBackup *pBackup)
 {
+	pBackup->SetIndex((int)m_listBackup.size());
 	m_listBackup.push_back(pBackup);
+	if (m_timeLatestSave < pBackup->GetCreateTime()) {
+		m_timeLatestSave = pBackup->GetCreateTime();
+	}
 	return S_OK;
 }
 
@@ -378,12 +579,29 @@ HRESULT CBackupSetImpl::RemoveBackup(CBackup *pBackup)
 	while (it != m_listBackup.end()) {
 		if (*it == pBackup) {
 			it = m_listBackup.erase(it);
+			break;
 		}
 		else {
 			it++;
 		}
 	}
+
+	UpdateBackupIndex(it);
+
 	return S_OK;
+}
+
+bool CBackupSetImpl::CompareBackupDate(CBackup *p1, CBackup *p2)
+{
+	FILETIME ft1, ft2;
+	SystemTimeToFileTime(&p1->GetCreateTime(), &ft1);
+	SystemTimeToFileTime(&p2->GetCreateTime(), &ft2);
+	return CompareFileTime(&ft1, &ft2) < 0;
+}
+
+bool CBackupSetImpl::CompareBackupIndex(CBackup *p1, CBackup *p2)
+{
+	return p1->GetIndex() < p2->GetIndex();
 }
 
 HRESULT CBackupSetImpl::Open(CBackupSet **ppList, PCTSTR pszProfileId, PCTSTR pszProfilePath, CContext *pContext)
@@ -420,8 +638,14 @@ HRESULT CBackupSetImpl::Open(CBackupSet **ppList, PCTSTR pszProfileId, PCTSTR ps
 			continue;
 		}
 
+		if (pThis->m_timeLatestSave < pBackup->GetCreateTime()) {
+			pThis->m_timeLatestSave = pBackup->GetCreateTime();
+		}
+
 		pThis->m_listBackup.push_back(pBackup);
 	}
+
+	pThis->LoadIndexList();
 
 	*ppList = pThis;
 	(*ppList)->AddRef();
@@ -433,6 +657,8 @@ HRESULT CBackupSetImpl::Open(CBackupSet **ppList, PCTSTR pszProfileId, PCTSTR ps
 /////////////////////////////////////////////////////////////////////////////
 
 CBackupImpl::CBackupImpl()
+	: m_bReadOnly(FALSE)
+	, m_nIndex(-1)
 {
 
 }
@@ -606,7 +832,7 @@ HRESULT CBackupImpl::Save()
 
 	SHFileOperation(&fos);
 
-	CString strSL2 = m_strPath + SL2_FILE_NAME;
+	CString strSL2 = m_strPath + SL2_FILE;
 	if (!PathFileExists(strSL2)) {
 		return E_FAIL;
 	}
@@ -651,6 +877,22 @@ HRESULT CBackupImpl::Delete()
 	return S_OK;
 }
 
+HRESULT CBackupImpl::IsAutosaved()
+{
+	return _tcscmp(m_strName, AUTOSAVE_NAME) == 0;
+}
+
+int CBackupImpl::GetIndex()
+{
+	return m_nIndex;
+}
+
+HRESULT CBackupImpl::SetIndex(int nIndex)
+{
+	m_nIndex = nIndex;
+	return S_OK;
+}
+
 HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, CContext *pContext, CBackupSet *pSet)
 {
 	HRESULT hr = S_OK;
@@ -680,7 +922,7 @@ HRESULT CBackupImpl::Open(CBackup **ppBackup, PCTSTR pszPath, CContext *pContext
 	}
 
 #if 1
-	CString strSL2 = strPath + SL2_FILE_NAME;
+	CString strSL2 = strPath + SL2_FILE;
 	if (!PathFileExists(strSL2)) {
 		return E_FAIL;
 	}
@@ -728,7 +970,7 @@ CBackupEnumImpl::~CBackupEnumImpl()
 
 HRESULT CBackupEnumImpl::Next(CBackup **ppBackup)
 {
-	if (m_it == m_pList->end()) {
+	if (m_it == m_list.end()) {
 		return S_FALSE;
 	}
 	*ppBackup = *(m_it++);
@@ -738,18 +980,20 @@ HRESULT CBackupEnumImpl::Next(CBackup **ppBackup)
 
 HRESULT CBackupEnumImpl::Reset()
 {
-	m_it = m_pList->begin();
+	m_it = m_list.begin();
 	return S_OK;
 }
 
-HRESULT CBackupEnumImpl::Open(CBackupEnum **ppEnum, CBackupList *pList)
+HRESULT CBackupEnumImpl::Open(CBackupEnum **ppEnum, CBackupList *pList, CBackupSetImpl *pSet)
 {
-	CComPtr <CBackupEnumImpl> pThis = new CBackupEnumImpl;
+	CComPtr <CBackupEnumImpl> pThis;
+	pThis = new CBackupEnumImpl;
 	if (!pThis) {
 		return E_FAIL;
 	}
-	pThis->m_pList = pList;
-	pThis->m_it = pList->begin();
+	pThis->m_list = *pList;
+	pThis->m_it = pThis->m_list.begin();
+	pThis->m_pSet = pSet;
 	*ppEnum = pThis;
 	(*ppEnum)->AddRef();
 	return S_OK;

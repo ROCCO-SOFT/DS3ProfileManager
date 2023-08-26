@@ -66,5 +66,19 @@
     <None Include="res\ProfileManager.rc2">
       <Filter>リソース ファイル</Filter>
     </None>
+    <None Include="res\COPY.cur">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="res\MOVE.cur">
+      <Filter>リソース ファイル</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\SortAsc.bmp">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="res\SortDec.bmp">
+      <Filter>リソース ファイル</Filter>
+    </Image>
   </ItemGroup>
 </Project>
