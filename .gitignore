@@ -269,3 +269,6 @@ __pycache__/
 /SKRProfileManagerSetup/SKR-Debug
 /SKRProfileManagerSetup/SKR-Release
 /x64
+/AC6ProfileManagerSetup/AC6-Release
+/DSRProfileManagerSetup/DSR-Debug
+/AC6ProfileManagerSetup/AC6-Debug
