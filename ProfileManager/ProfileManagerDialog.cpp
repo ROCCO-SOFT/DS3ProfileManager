@@ -214,6 +214,14 @@ BOOL CProfileManagerDialog::OnInitDialog()
 
 	m_nSort = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.Sort"), m_nSort);
 
+	COLORREF crText = m_listProfile.GetTextColor();
+	COLORREF crTextBk = m_listProfile.GetTextBkColor();
+	COLORREF crBk = m_listProfile.GetBkColor();
+
+	crText = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.TextColor"), crText);
+	crTextBk = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.TextBkColor"), crTextBk);
+	crBk = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.BkColor"), crBk);
+
 	GetClientRect(&m_rcClient);
 
 	CString strTitleFormat;
@@ -279,6 +287,10 @@ BOOL CProfileManagerDialog::OnInitDialog()
 	if (FAILED(hr)) {
 		return FALSE;
 	}
+
+	m_listProfile.SetTextColor(crText);
+	m_listProfile.SetTextBkColor(crTextBk);
+	m_listProfile.SetBkColor(crBk);
 
 	m_listProfile.SetExtendedStyle(LVS_EX_FULLROWSELECT);
 	InsertListColumn(&m_listProfile, 0, IDS_LIST_HEADER_NAME, 0, nNameWidth);
@@ -668,6 +680,14 @@ void CProfileManagerDialog::OnClose()
 
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.Sort"), m_nSort);
 
+	COLORREF crText = m_listProfile.GetTextColor();
+	COLORREF crTextBk = m_listProfile.GetTextBkColor();
+	COLORREF crBk = m_listProfile.GetBkColor();
+
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.TextColor"), crText);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.TextBkColor"), crTextBk);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.BkColor"), crBk);
+
 	// cleanup.
 	EnableAutoSave(FALSE);
 
@@ -1047,4 +1067,18 @@ void CProfileManagerDialog::OnLButtonUp(UINT nFlags, CPoint point)
 	__super::OnLButtonUp(nFlags, point);
 }
 
+BOOL CProfileManagerDialog::PreTranslateMessage(MSG* pMsg)
+{
+	if (pMsg->message == WM_KEYDOWN) {
+		switch (pMsg->wParam) {
+		case VK_RETURN:
+			return FALSE;
+		case VK_ESCAPE:
+			return FALSE;
+		default:
+			break;
+		}
+	}
+	return __super::PreTranslateMessage(pMsg);
+}
 

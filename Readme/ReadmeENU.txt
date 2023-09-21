@@ -27,12 +27,15 @@ Profile Manager (Alpha) Release Notes
 3. Installation
 
   Run {DSR|DS3|ER|SKR}ProfileManager.msi. Please follow the instructions on the screen to install.
+  *The message "Windows has protected your PC" may be displayed. In that case, click [Details] and then click the [Run] button.
+  *To start directly without using the installer, run {DSR|DS3|ER|SKR}ProfileManager.exe.
 
  
 4. How to operate
 
   a. To start {DSR|DS3|ER|SKR}Profile Manager
      Click [Roccosoft] - [{DSR|DS3|ER|SKR} Profile Manager] from the Windows Start menu.
+     *To start directly without using the installer, run {DSR|DS3|ER|SKR}ProfileManager.exe.
 
   b. To save save data while playing the game
      Click the [Save] button at the bottom of the window. *
@@ -61,8 +64,26 @@ Profile Manager (Alpha) Release Notes
      You can drag each item up or down to rearrange them in any order (user specified order).
      Clicking the column header (Name, Date only) in the list switches between ascending order, descending order, and user-specified order.
 
+  j. Changing the color of the list part (tentative)
+     You can change the color of the list part by changing the following value (RGB value) of the registry key.
+     *If you do not have knowledge about registry operations, please do not perform this operation as it may damage the system.
+     [KEY_CURRENT_USER\SOFTWARE\RoccoSoft\{DSR|DS3|ER|SKR}ProfileManager\Settings]
+     "ProfileList.TextColor"=dword:00000000
+     "ProfileList.TextBkColor"=dword:00ffffff
+     "ProfileList.BkColor"=dword:00ffffff
+
+  k. About save data storage location and registry key location
+     Save data is saved in the following folder.
+     C:\Users\<username>\Documents\{DSR|DS3|ER|SKR}ProfileManager
+     The registry keys related to settings are as follows.
+     [KEY_CURRENT_USER\SOFTWARE\RoccoSoft\{DSR|DS3|ER|SKR}ProfileManager\Settings]
+
 
 5. History (newest first)
+
+ 0.1.7 (2023/09/21)
+    - Fixed a bug where the window would close when pressing the ESC or ENTER key.
+    - The font color and background color of the list part can now be changed.
 
  0.1.5 (2023/08/27)
     - Moved the location of the start menu under Roccosoft.
