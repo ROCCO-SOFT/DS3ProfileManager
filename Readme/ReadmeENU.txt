@@ -26,16 +26,16 @@ Profile Manager (Alpha) Release Notes
 
 3. Installation
 
+  *To start directly without using the installer, run {DSR|DS3|ER|SKR}ProfileManager.exe.
   Run {DSR|DS3|ER|SKR}ProfileManager.msi. Please follow the instructions on the screen to install.
   *The message "Windows has protected your PC" may be displayed. In that case, click [Details] and then click the [Run] button.
-  *To start directly without using the installer, run {DSR|DS3|ER|SKR}ProfileManager.exe.
 
  
 4. How to operate
 
   a. To start {DSR|DS3|ER|SKR}Profile Manager
-     Click [Roccosoft] - [{DSR|DS3|ER|SKR} Profile Manager] from the Windows Start menu.
      *To start directly without using the installer, run {DSR|DS3|ER|SKR}ProfileManager.exe.
+     Click [Roccosoft] - [{DSR|DS3|ER|SKR} Profile Manager] from the Windows Start menu.
 
   b. To save save data while playing the game
      Click the [Save] button at the bottom of the window. *
@@ -80,6 +80,10 @@ Profile Manager (Alpha) Release Notes
 
 
 5. History (newest first)
+
+ 0.2.9 (2023/10/05)
+    - Added menu bar and right-click menu. Various functions can now be accessed from the menu.
+    - Added a function to always display the window on top. Click [Always on top] in the [View] menu.
 
  0.1.7 (2023/09/21)
     - Fixed a bug where the window would close when pressing the ESC or ENTER key.

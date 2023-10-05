@@ -120,6 +120,34 @@ BEGIN_MESSAGE_MAP(CProfileManagerDialog, CDialogEx)
 	ON_NOTIFY(LVN_BEGINDRAG, IDC_PROFILE_LIST, &CProfileManagerDialog::OnLvnBeginDragProfileList)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
+	ON_UPDATE_COMMAND_UI(ID_APP_ABOUT, &CProfileManagerDialog::OnUpdateAppAbout)
+	ON_COMMAND(ID_APP_ABOUT, &CProfileManagerDialog::OnAppAbout)
+	ON_UPDATE_COMMAND_UI(ID_APP_README, &CProfileManagerDialog::OnUpdateAppReadme)
+	ON_COMMAND(ID_APP_README, &CProfileManagerDialog::OnAppReadme)
+	ON_UPDATE_COMMAND_UI_RANGE(ID_SORT_MIN, ID_SORT_MAX, &CProfileManagerDialog::OnUpdateSort)
+	ON_COMMAND_RANGE(ID_SORT_MIN, ID_SORT_MAX, &CProfileManagerDialog::OnSort)
+	ON_WM_INITMENUPOPUP()
+	ON_UPDATE_COMMAND_UI(ID_BACKUP_SAVE, &CProfileManagerDialog::OnUpdateBackupSave)
+	ON_COMMAND(ID_BACKUP_SAVE, &CProfileManagerDialog::OnBackupSave)
+	ON_UPDATE_COMMAND_UI(ID_BACKUP_OVERWRITE, &CProfileManagerDialog::OnUpdateBackupOverwrite)
+	ON_COMMAND(ID_BACKUP_OVERWRITE, &CProfileManagerDialog::OnBackupOverwrite)
+	ON_UPDATE_COMMAND_UI(ID_BACKUP_LOAD, &CProfileManagerDialog::OnUpdateBackupLoad)
+	ON_COMMAND(ID_BACKUP_LOAD, &CProfileManagerDialog::OnBackupLoad)
+	ON_UPDATE_COMMAND_UI(ID_BACKUP_REMOVE, &CProfileManagerDialog::OnUpdateBackupRemove)
+	ON_COMMAND(ID_BACKUP_REMOVE, &CProfileManagerDialog::OnBackupRemove)
+	ON_UPDATE_COMMAND_UI(ID_BACKUP_RENAME, &CProfileManagerDialog::OnUpdateBackupRename)
+	ON_COMMAND(ID_BACKUP_RENAME, &CProfileManagerDialog::OnBackupRename)
+	ON_UPDATE_COMMAND_UI(ID_VIEW_MENU_VISIBLE, &CProfileManagerDialog::OnUpdateViewMenuVisible)
+	ON_COMMAND(ID_VIEW_MENU_VISIBLE, &CProfileManagerDialog::OnViewMenuVisible)
+	ON_UPDATE_COMMAND_UI(ID_VIEW_HEADER_VISIBLE, &CProfileManagerDialog::OnUpdateViewHeaderVisible)
+	ON_COMMAND(ID_VIEW_HEADER_VISIBLE, &CProfileManagerDialog::OnViewHeaderVisible)
+	ON_UPDATE_COMMAND_UI(ID_VIEW_AUTOSAVE_VISIBLE, &CProfileManagerDialog::OnUpdateViewAutosaveVisible)
+	ON_COMMAND(ID_VIEW_AUTOSAVE_VISIBLE, &CProfileManagerDialog::OnViewAutosaveVisible)
+	ON_UPDATE_COMMAND_UI_RANGE(ID_SETTINGS_MIN, ID_SETTINGS_MAX, &CProfileManagerDialog::OnUpdateSettings)
+	ON_COMMAND_RANGE(ID_SETTINGS_MIN, ID_SETTINGS_MAX, &CProfileManagerDialog::OnSettings)
+	ON_WM_CONTEXTMENU()
+	ON_UPDATE_COMMAND_UI(ID_VIEW_TOPMOST, &CProfileManagerDialog::OnUpdateViewTopmost)
+	ON_COMMAND(ID_VIEW_TOPMOST, &CProfileManagerDialog::OnViewTopmost)
 END_MESSAGE_MAP()
 
 CProfileManagerDialog::CProfileManagerDialog(CWnd* pParent /*=nullptr*/)
@@ -128,7 +156,11 @@ CProfileManagerDialog::CProfileManagerDialog(CWnd* pParent /*=nullptr*/)
 	, m_nAutosaveMinInterval(1000 * 60)
 	, m_bHideAutosaved(FALSE)
 	, m_nSort(SORT_USER)
+	, m_bSortDescending(FALSE)
 	, m_nMaxAutosaves(300)
+	, m_bSaveBeforeLoading(FALSE)
+	, m_pMenu(NULL)
+	, m_bTopMost(FALSE)
 {
 
 }
@@ -211,8 +243,10 @@ BOOL CProfileManagerDialog::OnInitDialog()
 	m_nAutosaveMinInterval = AfxGetApp()->GetProfileInt(_T("Settings"), _T("Autosave.MinInterval"), m_nAutosaveMinInterval);
 	m_bHideAutosaved = AfxGetApp()->GetProfileInt(_T("Settings"), _T("Autosave.HideAutosaved"), m_bHideAutosaved);
 	m_nMaxAutosaves = AfxGetApp()->GetProfileInt(_T("Settings"), _T("Autosave.MaxAutosaves"), m_nMaxAutosaves);
+	m_bSaveBeforeLoading = AfxGetApp()->GetProfileInt(_T("Settings"), _T("Autosave.SaveBeforeLoading"), m_bSaveBeforeLoading);
 
 	m_nSort = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.Sort"), m_nSort);
+	m_bSortDescending = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.SortDescending"), m_bSortDescending);
 
 	COLORREF crText = m_listProfile.GetTextColor();
 	COLORREF crTextBk = m_listProfile.GetTextBkColor();
@@ -221,6 +255,22 @@ BOOL CProfileManagerDialog::OnInitDialog()
 	crText = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.TextColor"), crText);
 	crTextBk = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.TextBkColor"), crTextBk);
 	crBk = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.BkColor"), crBk);
+
+	BOOL bMenu = GetMenu() != NULL;
+	bMenu = AfxGetApp()->GetProfileInt(_T("Settings"), _T("MainWindow.Menu"), bMenu);
+	if (!bMenu) {
+		m_pMenu = GetMenu();
+		SetMenu(NULL);
+	}
+
+	BOOL bNoHeader = m_listProfile.GetStyle() & LVS_NOCOLUMNHEADER;
+	bNoHeader = AfxGetApp()->GetProfileInt(_T("Settings"), _T("ProfileList.NoHeader"), bNoHeader);
+	if (bNoHeader) {
+		m_listProfile.ModifyStyle(NULL, LVS_NOCOLUMNHEADER);
+	}
+
+	m_bTopMost = AfxGetApp()->GetProfileInt(_T("Settings"), _T("MainWindow.TopMost"), m_bTopMost);
+	SetTopMost(m_bTopMost);
 
 	GetClientRect(&m_rcClient);
 
@@ -244,42 +294,13 @@ BOOL CProfileManagerDialog::OnInitDialog()
 
 		BOOL bNameValid;
 
-		CString strAutosaveMenu;
-		bNameValid = strAutosaveMenu.LoadString(IDS_AUTOSAVE);
+		CString strShowMenu;
+		bNameValid = strShowMenu.LoadString(IDS_SHOW_MENU);
 		ASSERT(bNameValid);
-		if (!strAutosaveMenu.IsEmpty())
+		if (!strShowMenu.IsEmpty())
 		{
-			pSysMenu->AppendMenu(MF_STRING, IDM_AUTOSAVE, strAutosaveMenu);
-			pSysMenu->CheckMenuItem(IDM_AUTOSAVE, m_bEnableAutosave ? MF_CHECKED : MF_UNCHECKED);
-		}
-
-		CString strHideAutosavedMenu;
-		bNameValid = strHideAutosavedMenu.LoadString(IDS_HIDE_AUTOSAVED);
-		ASSERT(bNameValid);
-		if (!strAutosaveMenu.IsEmpty())
-		{
-			pSysMenu->AppendMenu(MF_STRING, IDM_HIDE_AUTOSAVED, strHideAutosavedMenu);
-			pSysMenu->CheckMenuItem(IDM_HIDE_AUTOSAVED, m_bHideAutosaved ? MF_CHECKED : MF_UNCHECKED);
-		}
-
-		/////////////////////////////////////////////////////////////////////////////
-		pSysMenu->AppendMenu(MF_SEPARATOR);
-		/////////////////////////////////////////////////////////////////////////////
-
-		CString strReadmeMenu;
-		bNameValid = strReadmeMenu.LoadString(IDS_README);
-		ASSERT(bNameValid);
-		if (!strReadmeMenu.IsEmpty())
-		{
-			pSysMenu->AppendMenu(MF_STRING, IDM_README, strReadmeMenu);
-		}
-
-		CString strAboutMenu;
-		bNameValid = strAboutMenu.LoadString(IDS_ABOUTBOX);
-		ASSERT(bNameValid);
-		if (!strAboutMenu.IsEmpty())
-		{
-			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
+			pSysMenu->AppendMenu(MF_STRING, IDM_SHOW_MENU, strShowMenu);
+			pSysMenu->CheckMenuItem(IDM_SHOW_MENU, !m_pMenu ? MF_CHECKED : MF_UNCHECKED);
 		}
 	}
 
@@ -314,7 +335,7 @@ BOOL CProfileManagerDialog::OnInitDialog()
 	UpdateData(FALSE);
 
 	EnableAutoSave(m_bEnableAutosave);
-	UpdateSort(m_nSort);
+	UpdateSort(m_nSort, m_bSortDescending);
 
 	return TRUE;
 }
@@ -354,38 +375,13 @@ int CProfileManagerDialog::UpdateList(int nItem)
 
 void CProfileManagerDialog::OnSysCommand(UINT nID, LPARAM lParam)
 {
-	if ((nID & 0xFFF0) == IDM_AUTOSAVE)
+	if ((nID & 0xFFF0) == IDM_SHOW_MENU)
 	{
-		EnableAutoSave(!m_bEnableAutosave);
+		OnViewMenuVisible();
 		CMenu* pSysMenu = GetSystemMenu(FALSE);
-		pSysMenu->CheckMenuItem(IDM_AUTOSAVE, m_bEnableAutosave ? MF_CHECKED : MF_UNCHECKED);
+		pSysMenu->CheckMenuItem(IDM_SHOW_MENU, m_pMenu == NULL ? MF_CHECKED : MF_UNCHECKED);
 	}
-	else if ((nID & 0xFFF0) == IDM_HIDE_AUTOSAVED)
-	{
-		HideAutosaved(!m_bHideAutosaved);
-		CMenu* pSysMenu = GetSystemMenu(FALSE);
-		pSysMenu->CheckMenuItem(IDM_HIDE_AUTOSAVED, m_bHideAutosaved ? MF_CHECKED : MF_UNCHECKED);
-	}
-	else if ((nID & 0xFFF0) == IDM_ABOUTBOX)
-	{
-		CAboutDlg dlgAbout;
-		dlgAbout.DoModal();
-	}
-	else if ((nID & 0xFFF0) == IDM_README)
-	{
-		TCHAR path[_MAX_PATH];
-		GetModuleFileName(NULL, path, _MAX_PATH);
-		TCHAR drive[_MAX_DRIVE], dir[_MAX_DIR], fname[_MAX_FNAME], ext[_MAX_EXT];
-		_tsplitpath_s(path, drive, dir, fname, ext);
-		CString strReadmeFileName;
-		strReadmeFileName.LoadString(IDS_README_FILE_NAME);
-		CString strReadmePathName;
-		strReadmePathName += drive;
-		strReadmePathName += dir;
-		strReadmePathName += strReadmeFileName;
-		ShellExecute(GetSafeHwnd(), _T("open"), strReadmePathName, NULL, NULL, SW_SHOWNORMAL);
-	}
-	else 
+	else
 	{
 		CDialogEx::OnSysCommand(nID, lParam);
 	}
@@ -413,108 +409,18 @@ void CProfileManagerDialog::UpdateLastLoad(int nItem)
 
 void CProfileManagerDialog::OnBnClickedSaveButton()
 {
-	HRESULT hr = S_OK;
-
-	UpdateData();
-
-	CComPtr <CBackup> pBackup;
-	hr = m_pContext->GetCurrentBackupSet()->SaveCurrent(&pBackup, NEWSAVE_NAME);
-	if (FAILED(hr)) {
-		return;
-	}
-
-	int nItem = InsertItem(-1, pBackup);
-	UpdateLastSave(nItem);
-
-	m_listProfile.SetItemState(nItem, LVIS_FOCUSED | LVIS_SELECTED, LVIS_FOCUSED | LVIS_SELECTED);
-	m_listProfile.EnsureVisible(nItem, FALSE);
-	m_listProfile.SetFocus();
-	m_listProfile.EditLabel(nItem);
-	Sleep(300);
-	m_listProfile.GetEditControl()->SetFocus();
 }
 
 void CProfileManagerDialog::OnBnClickedOverwriteButton()
 {
-	HRESULT hr = S_OK;
-
-	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
-	if (pos == NULL) {
-		return;
-	}
-
-	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_OVERWRITE, MB_OKCANCEL | MB_ICONQUESTION);
-	if (nPrompt == IDCANCEL) {
-		return;
-	}
-
-	//OnBnClickedSaveButton();
-
-	int nItem = m_listProfile.GetNextSelectedItem(pos);
-	CComPtr <CBackup> pBackup;
-	pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
-
-	hr = pBackup->Save();
-
-	UpdateList(nItem);
-	UpdateLastSave(nItem);
 }
 
 void CProfileManagerDialog::OnBnClickedLoadButton()
 {
-	HRESULT hr = S_OK;
-
-	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
-	if (pos == NULL) {
-		return;
-	}
-
-	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_LOAD, MB_OKCANCEL | MB_ICONQUESTION);
-	if (nPrompt == IDCANCEL) {
-		return;
-	}
-
-	//OnBnClickedSaveButton();
-
-	int nItem = m_listProfile.GetNextSelectedItem(pos);
-	CComPtr <CBackup> pBackup;
-	pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
-
-	hr = pBackup->Load();
-
-	UpdateLastLoad(nItem);
 }
 
 void CProfileManagerDialog::OnBnClickedRemoveButton()
 {
-	HRESULT hr = S_OK;
-
-	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
-	if (pos == NULL) {
-		return;
-	}
-
-	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_DELETE, MB_OKCANCEL | MB_ICONQUESTION);
-	if (nPrompt == IDCANCEL) {
-		return;
-	}
-
-	//OnBnClickedSaveButton();
-
-	CWaitCursor wait;
-	CBackupList listMove;
-	for (int nItem = m_listProfile.GetItemCount() - 1; nItem >= 0; nItem--) {
-		if (m_listProfile.GetItemState(nItem, LVIS_SELECTED) == LVIS_SELECTED) {
-			CComPtr <CBackup> pBackup;
-			pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
-			hr = pBackup->Delete();
-			if (FAILED(hr)) {
-				return;
-			}
-			m_listProfile.DeleteItem(nItem);
-			m_listProfile.RedrawWindow(NULL, NULL, RDW_UPDATENOW);
-		}
-	}
 }
 
 BOOL CProfileManagerDialog::AlignControl(HWND hParent, int cx, int cy, int arID[], int nCount, int nFunc)
@@ -677,8 +583,10 @@ void CProfileManagerDialog::OnClose()
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("Autosave.MinInterval"), m_nAutosaveMinInterval);
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("Autosave.HideAutosaved"), m_bHideAutosaved);
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("Autosave.MaxAutosaves"), m_nMaxAutosaves);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("Autosave.SaveBeforeLoading"), m_bSaveBeforeLoading);
 
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.Sort"), m_nSort);
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.SortDescending"), m_bSortDescending);
 
 	COLORREF crText = m_listProfile.GetTextColor();
 	COLORREF crTextBk = m_listProfile.GetTextBkColor();
@@ -687,6 +595,14 @@ void CProfileManagerDialog::OnClose()
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.TextColor"), crText);
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.TextBkColor"), crTextBk);
 	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.BkColor"), crBk);
+
+	BOOL bMenu = GetMenu() != NULL;
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("MainWindow.Menu"), bMenu);
+
+	BOOL bNoHeader = m_listProfile.GetStyle() & LVS_NOCOLUMNHEADER;
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("ProfileList.NoHeader"), bNoHeader);
+
+	AfxGetApp()->WriteProfileInt(_T("Settings"), _T("MainWindow.TopMost"), m_bTopMost);
 
 	// cleanup.
 	EnableAutoSave(FALSE);
@@ -765,7 +681,7 @@ HRESULT CProfileManagerDialog::BackupSetAutoSaveParged(CBackupSet *pBackupSet, C
 	return S_OK;
 }
 
-void CProfileManagerDialog::UpdateSortIcon(int nSort)
+void CProfileManagerDialog::UpdateSortIcon(int nSort, BOOL bDescending)
 {
 	CHeaderCtrl* pHeader = m_listProfile.GetHeaderCtrl();
 
@@ -782,11 +698,9 @@ void CProfileManagerDialog::UpdateSortIcon(int nSort)
 	int nSubItem = 0;
 	switch (nSort) {
 	case SORT_NAME:
-	case SORT_NAME_DEC:
 		nSubItem = 0;
 		break;
 	case SORT_DATE:
-	case SORT_DATE_DEC:
 		nSubItem = 1;
 		break;
 	case SORT_USER:
@@ -797,28 +711,33 @@ void CProfileManagerDialog::UpdateSortIcon(int nSort)
 	pHeader->GetItem(nSubItem, &hdi);
 
 	hdi.mask = HDI_IMAGE | HDI_FORMAT;
-	switch (nSort) {
-	case SORT_NAME:
-	case SORT_DATE:
-		hdi.iImage = 0;
-		break;
-	case SORT_NAME_DEC:
-	case SORT_DATE_DEC:
+	if (bDescending) {
 		hdi.iImage = 1;
-		break;
-	case SORT_USER:
-		return;
+	}
+	else {
+		hdi.iImage = 0;
 	}
 
 	hdi.fmt = HDF_STRING | HDF_IMAGE | HDF_BITMAP_ON_RIGHT;
 	pHeader->SetItem(nSubItem, &hdi);
 }
 
-void CProfileManagerDialog::UpdateSort(int nSort)
+void CProfileManagerDialog::UpdateSort(int nSort, BOOL bDescending)
 {
 	m_nSort = nSort;
-	m_listProfile.SortItems(CompareListItem, m_nSort);
-	UpdateSortIcon(m_nSort);
+	m_bSortDescending = bDescending;
+	switch (nSort) {
+	case SORT_NAME:
+		m_listProfile.SortItems(CompareListItem_Name, !m_bSortDescending);
+		break;
+	case SORT_DATE:
+		m_listProfile.SortItems(CompareListItem_Date, !m_bSortDescending);
+		break;
+	case SORT_USER:
+		m_listProfile.SortItems(CompareListItem_User, 0);
+		break;
+	}
+	UpdateSortIcon(m_nSort, m_bSortDescending);
 }
 
 int CProfileManagerDialog::FindItem(CBackup *pBackup)
@@ -847,67 +766,66 @@ void CProfileManagerDialog::OnHdnItemclickProfileList(NMHDR *pNMHDR, LRESULT *pR
 		return;
 	}
 
-	int nSort = SORT_USER;
 	switch (phdr->iItem) {
 	case 0:	// name
 		if (m_nSort == SORT_NAME) {
-			nSort = SORT_NAME_DEC;
-		}
-		else if (m_nSort == SORT_NAME_DEC) {
-			nSort = SORT_USER;
+			if (m_bSortDescending) {
+				m_nSort = SORT_USER;
+			}
+			else {
+				m_bSortDescending = TRUE;
+			}
 		}
 		else {
-			nSort = SORT_NAME;
+			m_nSort = SORT_NAME;
+			m_bSortDescending = FALSE;
 		}
+		UpdateSort(m_nSort, m_bSortDescending);
 		break;
 	case 1:	// date
 		if (m_nSort == SORT_DATE) {
-			nSort = SORT_DATE_DEC;
-		}
-		else if (m_nSort == SORT_DATE_DEC) {
-			nSort = SORT_USER;
+			if (m_bSortDescending) {
+				m_nSort = SORT_USER;
+			}
+			else {
+				m_bSortDescending = TRUE;
+			}
 		}
 		else {
-			nSort = SORT_DATE;
+			m_nSort = SORT_DATE;
+			m_bSortDescending = FALSE;
 		}
-		break;
-	case 2:
-		return;
-		break;	//　no effect
+		UpdateSort(m_nSort, m_bSortDescending);
 	}
-
-	UpdateSort(nSort);
 
 	*pResult = 0;
 }
 
-int CProfileManagerDialog::CompareListItem(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
+int CProfileManagerDialog::CompareListItem_Name(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
 {
 	CComPtr <CBackup> pb1 = (CBackup *)lParam1;
 	CComPtr <CBackup> pb2 = (CBackup *)lParam2;
 
-	switch (lParamSort) {
+	return pb1->GetName().CompareNoCase(pb2->GetName()) * (((BOOL)lParamSort) ? 1 : -1);
+}
 
-	case SORT_NAME:
-	case SORT_NAME_DEC:
-		return pb1->GetName().CompareNoCase(pb2->GetName()) * ((lParamSort == SORT_NAME) ? 1 : -1);
-		break;
+int CProfileManagerDialog::CompareListItem_Date(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
+{
+	CComPtr <CBackup> pb1 = (CBackup *)lParam1;
+	CComPtr <CBackup> pb2 = (CBackup *)lParam2;
 
-	case SORT_DATE:
-	case SORT_DATE_DEC:
-	{
-		FILETIME ft1, ft2;
-SystemTimeToFileTime(&pb1->GetCreateTime(), &ft1);
-SystemTimeToFileTime(&pb2->GetCreateTime(), &ft2);
-return CompareFileTime(&ft1, &ft2)  * ((lParamSort == SORT_DATE) ? 1 : -1);
-	}
-	break;
+	FILETIME ft1, ft2;
+	SystemTimeToFileTime(&pb1->GetCreateTime(), &ft1);
+	SystemTimeToFileTime(&pb2->GetCreateTime(), &ft2);
+	return CompareFileTime(&ft1, &ft2)  * (((BOOL)lParamSort) ? 1 : -1);
+}
 
-	default:
-	case SORT_USER:
-		return (pb1->GetIndex() - pb2->GetIndex());
-		break;
-	}
+int CProfileManagerDialog::CompareListItem_User(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
+{
+	CComPtr <CBackup> pb1 = (CBackup *)lParam1;
+	CComPtr <CBackup> pb2 = (CBackup *)lParam2;
+
+	return (pb1->GetIndex() - pb2->GetIndex());
 }
 
 HRESULT CProfileManagerDialog::SaveList()
@@ -1042,7 +960,7 @@ void CProfileManagerDialog::OnEndDrag(HWND hDlg, int x, int y)
 
 	//UpdateSort(SORT_USER);
 	m_nSort = SORT_USER;
-	UpdateSortIcon(m_nSort);
+	UpdateSortIcon(m_nSort, m_bSortDescending);
 	hr = SaveList();
 }
 
@@ -1081,4 +999,484 @@ BOOL CProfileManagerDialog::PreTranslateMessage(MSG* pMsg)
 	}
 	return __super::PreTranslateMessage(pMsg);
 }
+
+void CProfileManagerDialog::OnInitMenuPopup(CMenu* pPopupMenu, UINT nIndex, BOOL bSysMenu)
+{
+	//	AfxCancelModes(m_hWnd);
+
+	if (bSysMenu)
+		return;     // don't support system menu
+
+	// allow hook to consume message
+//	if (m_pNotifyHook != NULL &&
+//		m_pNotifyHook->OnInitMenuPopup(pMenu, nIndex, bSysMenu))
+//	{
+//		return;
+//	}
+
+	ENSURE_VALID(pPopupMenu);
+
+	// check the enabled state of various menu items
+
+	CCmdUI state;
+	state.m_pMenu = pPopupMenu;
+	ASSERT(state.m_pOther == NULL);
+	ASSERT(state.m_pParentMenu == NULL);
+
+	// determine if menu is popup in top-level menu and set m_pOther to
+	//  it if so (m_pParentMenu == NULL indicates that it is secondary popup)
+//	HMENU hParentMenu;
+//	if (AfxGetThreadState()->m_hTrackingMenu == pPopupMenu->m_hMenu)
+//		state.m_pParentMenu = pPopupMenu;    // parent == child for tracking popup
+//	else if ((hParentMenu = (m_dwMenuBarState == AFX_MBS_VISIBLE) ? ::GetMenu(m_hWnd) : m_hMenu) != NULL)
+//	{
+//		CWnd* pParent = GetTopLevelParent();
+//		// child windows don't have menus -- need to go to the top!
+//		if (pParent != NULL &&
+//			(hParentMenu = pParent->GetMenu()->GetSafeHmenu()) != NULL)
+//		{
+//			int nIndexMax = ::GetMenuItemCount(hParentMenu);
+//			for (int nItemIndex = 0; nItemIndex < nIndexMax; nItemIndex++)
+//			{
+//				if (::GetSubMenu(hParentMenu, nItemIndex) == pMenu->m_hMenu)
+//				{
+//					// when popup is found, m_pParentMenu is containing menu
+//					state.m_pParentMenu = CMenu::FromHandle(hParentMenu);
+//					break;
+//				}
+//			}
+//		}
+//	}
+
+	state.m_nIndexMax = pPopupMenu->GetMenuItemCount();
+	for (state.m_nIndex = 0; state.m_nIndex < state.m_nIndexMax;
+		state.m_nIndex++)
+	{
+		state.m_nID = pPopupMenu->GetMenuItemID(state.m_nIndex);
+		if (state.m_nID == 0)
+			continue; // menu separator or invalid cmd - ignore it
+
+		ASSERT(state.m_pOther == NULL);
+		ASSERT(state.m_pMenu != NULL);
+		if (state.m_nID == (UINT)-1)
+		{
+			// possibly a popup menu, route to first item of that popup
+			state.m_pSubMenu = pPopupMenu->GetSubMenu(state.m_nIndex);
+			if (state.m_pSubMenu == NULL ||
+				(state.m_nID = state.m_pSubMenu->GetMenuItemID(0)) == 0 ||
+				state.m_nID == (UINT)-1)
+			{
+				continue;       // first item of popup can't be routed to
+			}
+			state.DoUpdate(this, FALSE);    // popups are never auto disabled
+		}
+		else
+		{
+			// normal menu item
+			// Auto enable/disable if frame window has 'm_bAutoMenuEnable'
+			//    set and command is _not_ a system command.
+			state.m_pSubMenu = NULL;
+			state.DoUpdate(this, TRUE && state.m_nID < 0xF000);
+		}
+
+		// adjust for menu deletions and additions
+		UINT nCount = pPopupMenu->GetMenuItemCount();
+		if (nCount < state.m_nIndexMax)
+		{
+			state.m_nIndex -= (state.m_nIndexMax - nCount);
+			while (state.m_nIndex < nCount &&
+				pPopupMenu->GetMenuItemID(state.m_nIndex) == state.m_nID)
+			{
+				state.m_nIndex++;
+			}
+		}
+		state.m_nIndexMax = nCount;
+	}
+}
+
+void CProfileManagerDialog::OnContextMenu(CWnd* pWnd, CPoint point)
+{
+	CRect rcClient;
+	GetClientRect(&rcClient);
+	ClientToScreen(&rcClient);
+	if (!rcClient.PtInRect(point)) {
+		Default();
+		return;
+	}
+
+	CPoint point2 = point;
+	m_listProfile.ScreenToClient(&point2);
+	int nItem = m_listProfile.HitTest(point2, 0);
+
+	CMenu menu;
+	menu.LoadMenu(IDR_POPUP);
+	CMenu *pPopup = NULL;
+	if (nItem != -1) {
+		pPopup = menu.GetSubMenu(1);
+	}
+	else {
+		pPopup = menu.GetSubMenu(0);
+	}
+
+	pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON | TPM_RIGHTBUTTON, point.x, point.y, this);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+void CProfileManagerDialog::OnUpdateAppAbout(CCmdUI *pCmdUI)
+{
+
+}
+
+void CProfileManagerDialog::OnAppAbout()
+{
+	CAboutDlg dlgAbout;
+	dlgAbout.DoModal();
+}
+
+void CProfileManagerDialog::OnUpdateAppReadme(CCmdUI *pCmdUI)
+{
+
+}
+
+void CProfileManagerDialog::OnAppReadme()
+{
+	TCHAR path[_MAX_PATH];
+	GetModuleFileName(NULL, path, _MAX_PATH);
+	TCHAR drive[_MAX_DRIVE], dir[_MAX_DIR], fname[_MAX_FNAME], ext[_MAX_EXT];
+	_tsplitpath_s(path, drive, dir, fname, ext);
+	CString strReadmeFileName;
+	strReadmeFileName.LoadString(IDS_README_FILE_NAME);
+	CString strReadmePathName;
+	strReadmePathName += drive;
+	strReadmePathName += dir;
+	strReadmePathName += strReadmeFileName;
+	ShellExecute(GetSafeHwnd(), _T("open"), strReadmePathName, NULL, NULL, SW_SHOWNORMAL);
+}
+
+void CProfileManagerDialog::OnUpdateSort(CCmdUI *pCmdUI)
+{
+	switch (pCmdUI->m_nID) {
+	case ID_SORT_NAME:
+		pCmdUI->SetCheck(m_nSort == SORT_NAME);
+		break;
+	case ID_SORT_DATE:
+		pCmdUI->SetCheck(m_nSort == SORT_DATE);
+		break;
+	case ID_SORT_USER:
+		pCmdUI->SetCheck(m_nSort == SORT_USER);
+		break;
+	case ID_SORT_ASCENDING:
+		if (m_nSort == SORT_USER) {
+			pCmdUI->SetCheck(FALSE);
+			pCmdUI->Enable(FALSE);
+			return;
+		}
+		pCmdUI->SetCheck(!m_bSortDescending);
+		break;
+	case ID_SORT_DESCENDING:
+		if (m_nSort == SORT_USER) {
+			pCmdUI->SetCheck(FALSE);
+			pCmdUI->Enable(FALSE);
+			return;
+		}
+		pCmdUI->SetCheck(m_bSortDescending);
+		break;
+	}
+}
+
+void CProfileManagerDialog::OnSort(UINT nID)
+{
+	switch (nID) {
+	case ID_SORT_NAME:
+		if (m_nSort != SORT_NAME) {
+			UpdateSort(SORT_NAME, m_bSortDescending);
+		}
+		break;
+	case ID_SORT_DATE:
+		if (m_nSort != SORT_DATE) {
+			UpdateSort(SORT_DATE, m_bSortDescending);
+		}
+		break;
+	case ID_SORT_USER:
+		if (m_nSort != SORT_USER) {
+			UpdateSort(SORT_USER, m_bSortDescending);
+		}
+		break;
+	case ID_SORT_ASCENDING:
+		if (m_nSort == SORT_USER) {
+			return;
+		}
+		UpdateSort(m_nSort, FALSE);
+		break;
+	case ID_SORT_DESCENDING:
+		if (m_nSort == SORT_USER) {
+			return;
+		}
+		UpdateSort(m_nSort, TRUE);
+		break;
+	}
+}
+
+void CProfileManagerDialog::OnUpdateBackupSave(CCmdUI *pCmdUI)
+{
+
+}
+
+void CProfileManagerDialog::OnBackupSave()
+{
+	HRESULT hr = S_OK;
+
+	UpdateData();
+
+	CComPtr <CBackup> pBackup;
+	hr = m_pContext->GetCurrentBackupSet()->SaveCurrent(&pBackup, NEWSAVE_NAME);
+	if (FAILED(hr)) {
+		return;
+	}
+
+	int nItem = InsertItem(-1, pBackup);
+	UpdateLastSave(nItem);
+
+	m_listProfile.SetItemState(nItem, LVIS_FOCUSED | LVIS_SELECTED, LVIS_FOCUSED | LVIS_SELECTED);
+	m_listProfile.EnsureVisible(nItem, FALSE);
+
+	m_listProfile.SetFocus();
+	m_listProfile.EditLabel(nItem);
+	Sleep(300);
+	m_listProfile.GetEditControl()->SetFocus();
+}
+
+void CProfileManagerDialog::OnUpdateBackupOverwrite(CCmdUI *pCmdUI)
+{
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		pCmdUI->Enable(FALSE);
+	}
+}
+
+void CProfileManagerDialog::OnBackupOverwrite()
+{
+	HRESULT hr = S_OK;
+
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		return;
+	}
+
+	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_OVERWRITE, MB_OKCANCEL | MB_ICONQUESTION);
+	if (nPrompt == IDCANCEL) {
+		return;
+	}
+
+	//OnBnClickedSaveButton();
+
+	int nItem = m_listProfile.GetNextSelectedItem(pos);
+	CComPtr <CBackup> pBackup;
+	pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
+
+	hr = pBackup->Save();
+
+	UpdateList(nItem);
+	UpdateLastSave(nItem);
+}
+
+void CProfileManagerDialog::OnUpdateBackupLoad(CCmdUI *pCmdUI)
+{
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		pCmdUI->Enable(FALSE);
+	}
+}
+
+void CProfileManagerDialog::OnBackupLoad()
+{
+	HRESULT hr = S_OK;
+
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		return;
+	}
+
+	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_LOAD, MB_OKCANCEL | MB_ICONQUESTION);
+	if (nPrompt == IDCANCEL) {
+		return;
+	}
+
+	//OnBnClickedSaveButton();
+	if (m_bSaveBeforeLoading) {
+		CComPtr <CBackup> pBackup;
+		hr = m_pContext->GetCurrentBackupSet()->SaveCurrent(&pBackup, AUTOSAVE_NAME);
+		if (FAILED(hr)) {
+			return;
+		}
+		int nItem = InsertItem(-1, pBackup);
+		UpdateLastSave(nItem);
+	}
+
+	int nItem = m_listProfile.GetNextSelectedItem(pos);
+	CComPtr <CBackup> pBackup;
+	pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
+
+	hr = pBackup->Load();
+
+	UpdateLastLoad(nItem);
+}
+
+void CProfileManagerDialog::OnUpdateBackupRemove(CCmdUI *pCmdUI)
+{
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		pCmdUI->Enable(FALSE);
+	}
+}
+
+void CProfileManagerDialog::OnBackupRemove()
+{
+	HRESULT hr = S_OK;
+
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		return;
+	}
+
+	UINT nPrompt = AfxMessageBox(IDS_CONFIRM_DELETE, MB_OKCANCEL | MB_ICONQUESTION);
+	if (nPrompt == IDCANCEL) {
+		return;
+	}
+
+	//OnBnClickedSaveButton();
+
+	CWaitCursor wait;
+	CBackupList listMove;
+	for (int nItem = m_listProfile.GetItemCount() - 1; nItem >= 0; nItem--) {
+		if (m_listProfile.GetItemState(nItem, LVIS_SELECTED) == LVIS_SELECTED) {
+			CComPtr <CBackup> pBackup;
+			pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
+			hr = pBackup->Delete();
+			if (FAILED(hr)) {
+				return;
+			}
+			m_listProfile.DeleteItem(nItem);
+			m_listProfile.RedrawWindow(NULL, NULL, RDW_UPDATENOW);
+		}
+	}
+}
+
+void CProfileManagerDialog::OnUpdateBackupRename(CCmdUI *pCmdUI)
+{
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		pCmdUI->Enable(FALSE);
+	}
+}
+
+void CProfileManagerDialog::OnBackupRename()
+{
+	HRESULT hr = S_OK;
+
+	POSITION pos = m_listProfile.GetFirstSelectedItemPosition();
+	if (pos == NULL) {
+		return;
+	}
+
+	int nItem = m_listProfile.GetNextSelectedItem(pos);
+	CComPtr <CBackup> pBackup;
+	pBackup = (CBackup *)m_listProfile.GetItemData(nItem);
+
+	m_listProfile.SetFocus();
+	m_listProfile.EditLabel(nItem);
+	Sleep(300);
+	m_listProfile.GetEditControl()->SetFocus();
+}
+
+void CProfileManagerDialog::OnUpdateViewMenuVisible(CCmdUI *pCmdUI)
+{
+	pCmdUI->SetCheck(m_pMenu == NULL);
+}
+
+void CProfileManagerDialog::OnViewMenuVisible()
+{
+	if (m_pMenu) {
+		SetMenu(m_pMenu);
+		m_pMenu = NULL;
+	}
+	else {
+		m_pMenu = GetMenu();
+		SetMenu(NULL);
+	}
+
+	CMenu* pSysMenu = GetSystemMenu(FALSE);
+	pSysMenu->CheckMenuItem(IDM_SHOW_MENU, !m_pMenu ? MF_CHECKED : MF_UNCHECKED);
+}
+
+void CProfileManagerDialog::OnUpdateViewHeaderVisible(CCmdUI *pCmdUI)
+{
+	BOOL bNoHeader = m_listProfile.GetStyle() & LVS_NOCOLUMNHEADER;
+	pCmdUI->SetCheck(!bNoHeader);
+}
+
+void CProfileManagerDialog::OnViewHeaderVisible()
+{
+	BOOL bNoHeader = m_listProfile.GetStyle() & LVS_NOCOLUMNHEADER;
+	bNoHeader = !bNoHeader;
+	if (bNoHeader) {
+		m_listProfile.ModifyStyle(NULL, LVS_NOCOLUMNHEADER);
+	}
+	else {
+		m_listProfile.ModifyStyle(LVS_NOCOLUMNHEADER, NULL);
+	}
+}
+
+void CProfileManagerDialog::OnUpdateViewAutosaveVisible(CCmdUI *pCmdUI)
+{
+	pCmdUI->SetCheck(!m_bHideAutosaved);
+}
+
+void CProfileManagerDialog::OnViewAutosaveVisible()
+{
+	HideAutosaved(!m_bHideAutosaved);
+}
+
+void CProfileManagerDialog::OnUpdateSettings(CCmdUI *pCmdUI)
+{
+	switch (pCmdUI->m_nID) {
+	case ID_SETTINGS_ENABLE_AUTOSAVE:
+		pCmdUI->SetCheck(m_bEnableAutosave);
+		break;
+	}
+}
+
+void CProfileManagerDialog::OnSettings(UINT nID)
+{
+	EnableAutoSave(!m_bEnableAutosave);
+}
+
+void CProfileManagerDialog::OnUpdateViewTopmost(CCmdUI *pCmdUI)
+{
+	pCmdUI->SetCheck(m_bTopMost);
+}
+
+void CProfileManagerDialog::OnViewTopmost()
+{
+	m_bTopMost = !m_bTopMost;
+	SetTopMost(m_bTopMost);
+}
+
+void CProfileManagerDialog::SetTopMost(BOOL bTopMost)
+{
+	if (bTopMost) {
+		SetWindowPos(&CWnd::wndTopMost, NULL, NULL, NULL, NULL, SWP_NOMOVE | SWP_NOSIZE);
+	}
+	else {
+		SetWindowPos(&CWnd::wndNoTopMost, NULL, NULL, NULL, NULL, SWP_NOMOVE | SWP_NOSIZE);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+
+
 
